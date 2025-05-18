@@ -22,12 +22,16 @@ RUN \
     && \
     /root/.cargo/bin/cargo install oxipng
 
-EXPOSE 3000
-
+    
+RUN mkdir /app
 WORKDIR /app
 
-COPY . /app
+COPY package*.json ./
 
 RUN yarn install && (cd node_modules/optipng-bin && npm run postinstall)
+
+COPY . .
+EXPOSE 3000
+
 
 CMD [ "npm", "run", "start" ]
