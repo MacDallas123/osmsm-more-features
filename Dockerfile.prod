@@ -28,7 +28,7 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN yarn install && (cd node_modules/optipng-bin && npm run postinstall)
+RUN yarn install
 
 COPY . .
 EXPOSE 3000
