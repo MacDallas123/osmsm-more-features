@@ -81,11 +81,20 @@
                 {{#if markerIconOptions}}
                     var myIcon = L.icon({{{markerIconOptions}}});
                 {{else}}
-                    var myIcon = L.icon({
-                        iconUrl: "data:image/png;base64,//markericonpng//",
-                        iconSize: [25, 41],
-                        iconAnchor: [15, 41]
-                    });
+                    var myIcon = null;
+                    {{#if markerVisible}}
+                        myIcon = L.icon({
+                            iconUrl: "data:image/png;base64,//markericonpng//",
+                            iconSize: [25, 41],
+                            iconAnchor: [15, 41]
+                        });
+                    {{else}}
+                        myIcon = L.icon({
+                            iconUrl: "data:image/png;base64,//markericonpng//",
+                            iconSize: [0, 0],
+                            iconAnchor: [15, 41]
+                        });
+                    {{/if}}
                 {{/if}}
                 var geojsonlayer = L.geoJson({{{ geojson }}}, {
                     pointToLayer: function (feature, latlng) {

@@ -76,6 +76,11 @@ program
     false
   )
   .option(
+    "-v, --markerVisible",
+    "When your geojson contains markers, set if they're visible",
+    false
+  )
+  .option(
     "-s, --scale [json string]",
     "Enable render a scale ruler (see options in https://leafletjs.com/reference-1.6.0.html#control-scale-option)",
     false

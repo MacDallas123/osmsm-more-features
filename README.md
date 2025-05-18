@@ -81,6 +81,7 @@ All parameters have a short and long version. The short version can be used only
 | x | imagemin | enable lossless compression with [optipng](https://github.com/imagemin/imagemin-optipng) / [jpegtran](https://github.com/imagemin/imagemin-jpegtran) | `false` |
 | X | oxipng | enable losslsess compression with [oxipng](https://github.com/shssoichiro/oxipng) | `false` |
 | a | arrows | render arrows to show the direction of linestrings | `false` |
+| v | markerVisible | When your geojson contains markers, set if they're visible | `false` |
 | s | scale | enable render a scale ruler (boolean or [a json options object](https://leafletjs.com/reference-1.6.0.html#control-scale-option)) | `false` |
 | T | timeout | miliseconds until page load throws timeout | `20000` |
 | k | markerIconOptions | set marker icon options ([a json options object](https://leafletjs.com/reference-1.6.0.html#icon-option)) *see note | `undefined` (leaflet's default marker) |

@@ -105,6 +105,12 @@ interface OsmStaticMapsOptions {
    */
   arrows?: boolean;
 
+   /**
+   * view marker on map
+   * @defaultValue `false`
+   */
+  markerVisible?: boolean;
+
   /**
    * enable render a scale ruler (boolean or [a json options object](https://leafletjs.com/reference-1.6.0.html#control-scale-option))
    * @defaultValue `false`
