@@ -30,6 +30,23 @@ async function calculateVehicleRoute(origin, destination) {
   }
 }
 
+const LABEL_STYLES = {
+    style1: {
+        borderColor: '#333',
+        backgroundColor: 'rgba(255,255,255,0.8)',
+        textColor: '#333',
+        padding: '3px 8px',
+        borderRadius: '4px',
+        borderWidth: '1px'
+    },
+    style2: {
+        textStroke: '1px #fff',
+        textColor: '#333',
+        textWidth: 'auto',
+        fontWeight: 'bold'
+    }
+};
+
 function createStraightLineRoute(origin, destination) {
   return {
     type: "LineString",
@@ -229,7 +246,8 @@ export default function(options) {
     options.timeout = typeof options.timeout == undefined ? 20000 : options.timeout;
     options.haltOnConsoleError = !!options.haltOnConsoleError;
     options.showLegend = options.showLegend || false;
-    
+    options.forceTransparentFill = options.forceTransparentFill !== true;
+
     (async () => {
 
       if (options.geojsonfile) {
@@ -280,6 +298,8 @@ export default function(options) {
                       fillOpacity: 0.2,
                       weight: 2
                   };
+              } else if (options.forceTransparentFill) {
+                  options.routes.originMarker.circle.fillOpacity = 0.3;
               }
           }
 
@@ -297,6 +317,8 @@ export default function(options) {
                       fillOpacity: 0.2,
                       weight: 2
                   };
+              } else if (options.forceTransparentFill) {
+                  options.routes.originMarker.circle.fillOpacity = 0.3;
               }
           }
 
@@ -316,7 +338,7 @@ export default function(options) {
 
           // Ajout des marqueurs
           if (originMarker?.visible !== false) {
-            features.push({
+             const markerFeature = {
                 type: "Feature",
                 geometry: { type: "Point", coordinates: origin },
                 properties: {
@@ -326,14 +348,19 @@ export default function(options) {
                             iconUrl: originMarker.iconUrl || `data:image/png;base64,${files.markericonpng}`,
                             iconSize: originMarker.iconSize || [25, 41],
                             iconAnchor: originMarker.iconAnchor || [12, 41]
-                        }
+                        },
+                        label: originMarker.label || null,
+                        legend: originMarker.legend || null,
+                        labelStyle: originMarker.labelStyle || 'style1',
+                        customLabelStyle: originMarker.customLabelStyle || null
                     }
                 }
-            });
+            };
+            features.push(markerFeature);
           }
 
           if (destinationMarker?.visible !== false) {
-            features.push({
+             const markerFeature = {
                 type: "Feature",
                 geometry: { type: "Point", coordinates: destination },
                 properties: {
@@ -343,10 +370,15 @@ export default function(options) {
                             iconUrl: destinationMarker.iconUrl || `data:image/png;base64,${files.markericonpng}`,
                             iconSize: destinationMarker.iconSize || [25, 41],
                             iconAnchor: destinationMarker.iconAnchor || [12, 41]
-                        }
+                        },
+                        label: destinationMarker.label || null,
+                        legend: destinationMarker.legend || null,
+                        labelStyle: destinationMarker.labelStyle || 'style1',
+                        customLabelStyle: destinationMarker.customLabelStyle || null
                     }
                 }
-            });
+            };
+            features.push(markerFeature);
           }
           
           if (showVehicle) {

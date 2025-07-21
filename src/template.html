@@ -94,6 +94,20 @@
             -moz-user-select: none;
             -ms-user-select: none;
         }
+
+        .map-label {
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .map-label div {
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .map-label div:hover {
+            transform: scale(1.05);
+        }
         </style>
         <script>
         //leafletjs//
@@ -118,8 +132,6 @@
 
         {{#if showLegend}}
             <div id="map">
-                <!-- ... contenu existant de la carte ... -->
-            
                 <div class="legend">
                     {{#if routes}}
                         {{#if routes.originMarker.visible}}
@@ -149,10 +161,47 @@
                             <span>Distance a vehicule</span>
                         </div>
                         {{/if}}
+
+                        {{#if routes.originMarker}}
+                            {{#if routes.originMarker.legend}}
+                            <div class="legend-item">
+                                <div class="legend-color" style="
+                                    {{#if routes.originMarker.circle}}
+                                        width: {{routes.originMarker.circle.radius}}px;
+                                        height: {{routes.originMarker.circle.radius}}px;
+                                        border-radius: 50%;
+                                        border: {{routes.originMarker.circle.weight}}px solid {{routes.originMarker.circle.color}};
+                                        background: {{routes.originMarker.circle.fillColor}};
+                                        opacity: {{routes.originMarker.circle.fillOpacity}};
+                                    {{/if}}
+                                "></div>
+                                <span>{{routes.originMarker.legend}}</span>
+                            </div>
+                            {{/if}}
+                        {{/if}}
+                        
+                        {{#if routes.destinationMarker}}
+                            {{#if routes.destinationMarker.legend}}
+                            <div class="legend-item">
+                                <div class="legend-color" style="
+                                    {{#if routes.destinationMarker.circle}}
+                                        width: {{routes.destinationMarker.circle.radius}}px;
+                                        height: {{routes.destinationMarker.circle.radius}}px;
+                                        border-radius: 50%;
+                                        border: {{routes.destinationMarker.circle.weight}}px solid {{routes.destinationMarker.circle.color}};
+                                        background: {{routes.destinationMarker.circle.fillColor}};
+                                        opacity: {{routes.destinationMarker.circle.fillOpacity}};
+                                    {{/if}}
+                                "></div>
+                                <span>{{routes.destinationMarker.legend}}</span>
+                            </div>
+                            {{/if}}
+                        {{/if}}
                     {{/if}}
                 </div>
             </div>
         {{/if}}
+
         <script>
 
             var initTime = performance.now();
@@ -211,39 +260,54 @@
                 
                 var geojsonlayer = L.geoJson({{{ geojson }}}, {
                     pointToLayer: function (feature, latlng) {
-                        /*if (feature.markerIconOptions) {
-                            // Gestion complète des options de marqueur
-                            var options = {
-                                iconUrl: feature.markerIconOptions.iconUrl || "data:image/png;base64,//markericonpng//",
-                                iconSize: feature.markerIconOptions.iconSize || [25, 41],
-                                iconAnchor: feature.markerIconOptions.iconAnchor || [12, 41],
-                                popupAnchor: feature.markerIconOptions.popupAnchor || [1, -34],
-                                shadowUrl: feature.markerIconOptions.shadowUrl,
-                                shadowSize: feature.markerIconOptions.shadowSize,
-                                shadowAnchor: feature.markerIconOptions.shadowAnchor,
-                                className: feature.markerIconOptions.className
-                            };
-                            return L.marker(latlng, {icon: L.icon(options)});
-                        }*/
-
-                        //return L.marker(latlng, {icon: defaultIcon});
-
+                        const markerOptions = feature.properties.markerOptions || {};
                         const marker = L.marker(latlng, {icon: defaultIcon});
                         
-                        // Ajouter un cercle si spécifié dans les propriétés du feature
-                        if (feature.properties?.markerOptions?.circle?.visible) {
-                            const circleOptions = feature.properties.markerOptions.circle;
+                        // Ajouter le cercle si spécifié
+                        if (markerOptions.circle?.visible) {
                             L.circle(latlng, {
-                                radius: circleOptions.radius,
-                                color: circleOptions.color,
-                                fillColor: circleOptions.fillColor,
-                                fillOpacity: circleOptions.fillOpacity,
-                                weight: circleOptions.weight
+                                radius: markerOptions.circle.radius,
+                                color: markerOptions.circle.color,
+                                fillColor: markerOptions.circle.fillColor,
+                                fillOpacity: markerOptions.circle.fillOpacity,
+                                weight: markerOptions.circle.weight
+                            }).addTo(map);
+                        }
+                        
+                        // Ajouter le label si spécifié
+                        if (markerOptions.label) {
+                            const style = markerOptions.customLabelStyle || 
+                                        LABEL_STYLES[markerOptions.labelStyle] || 
+                                        LABEL_STYLES.style1;
+                            
+                            const offset = markerOptions.iconOptions?.iconAnchor ? 
+                                        [markerOptions.iconOptions.iconAnchor[0] + 10, 0] : 
+                                        [25, 0];
+                            
+                            L.marker(latlng, {
+                                icon: L.divIcon({
+                                    html: `<div style="
+                                        ${style.borderColor ? `border: ${style.borderWidth || '1px'} solid ${style.borderColor};` : ''}
+                                        ${style.backgroundColor ? `background: ${style.backgroundColor};` : ''}
+                                        ${style.textColor ? `color: ${style.textColor};` : ''}
+                                        ${style.padding ? `padding: ${style.padding};` : ''}
+                                        ${style.borderRadius ? `border-radius: ${style.borderRadius};` : ''}
+                                        ${style.textStroke ? `-webkit-text-stroke: ${style.textStroke}; text-stroke: ${style.textStroke};` : ''}
+                                        ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+                                        ${style.textWidth ? `width: ${style.textWidth};` : ''}
+                                        display: inline-block;
+                                        white-space: nowrap;
+                                    ">${markerOptions.label}</div>`,
+                                    className: 'map-label',
+                                    iconSize: null,
+                                    iconAnchor: offset
+                                }),
+                                zIndexOffset: 1000
                             }).addTo(map);
                         }
                         
                         return marker;
-                    },
+                    }
                     onEachFeature: function (feature, layer) {
                         {{#if arrows}}
                             /*if (feature.type == 'LineString' || (feature.geometry && feature.geometry.type == 'LineString')) {
@@ -447,6 +511,7 @@
                     backgroundLayer.on('load', onLoadFn);
                 {{/if}}
             {{/if}}
+
 
         </script>
     </body>
