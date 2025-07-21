@@ -141,6 +141,27 @@ interface OsmStaticMapsOptions {
    * @defaultValue `false`
    */
   haltOnConsoleError?: Boolean;
+
+  /**
+   * Draw routes between two points (origin and destination)
+   * @defaultValue `undefined`
+   */
+  routes?: {
+    origin: [number, number];
+    destination: [number, number];
+    showVehicle?: boolean;
+    showStraight?: boolean;
+    vehicleOptions?: PathOptions;
+    straightOptions?: PathOptions;
+    originMarker?: IconOptions & { visible?: boolean }; // Style du marqueur d'origine
+    destinationMarker?: IconOptions & { visible?: boolean }; // Style du marqueur de destination
+  };
+
+  /**
+   * Affiche une légende sur la carte
+   * @defaultValue `false`
+   */
+  showLegend?: boolean;
 }
 
 /** Renders a map controlled by the options passed and returns an image */

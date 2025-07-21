@@ -17,6 +17,57 @@ if (process.env.AWS_LAMBDA_FUNCTION_VERSION) {
   puppeteer = (await import("puppeteer")).default;
 }
 
+async function calculateVehicleRoute(origin, destination) {
+  // Utilisation de l'API OSRM (Open Source Routing Machine)
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=full&geometries=geojson`;
+    const response = await httpGet(url);
+    const data = JSON.parse(response);
+    return data.routes[0].geometry;
+  } catch (e) {
+    console.error('OSRM request failed:', e);
+    return null;
+  }
+}
+
+function createStraightLineRoute(origin, destination) {
+  return {
+    type: "LineString",
+    coordinates: [origin, destination]
+  };
+}
+
+function calculateDistance(coords) {
+  const R = 6371e3; // Rayon de la Terre en mètres
+  let total = 0;
+
+  for (let i = 1; i < coords.length; i++) {
+    const [lon1, lat1] = coords[i-1];
+    const [lon2, lat2] = coords[i];
+    
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    total += R * c;
+  }
+
+  return total;
+}
+
+function formatDistance(meters) {
+  if (meters > 1000) {
+    return (meters / 1000).toFixed(1) + ' km';
+  }
+  return Math.round(meters) + ' m';
+}
+
 function getDep(nodeModulesFile, binary = false) {
   const abspath = fileURLToPath(import.meta.resolve(nodeModulesFile));
   if (binary) {
@@ -162,7 +213,8 @@ export default function(options) {
     options.width = options.width || 800;
     options.center = options.center || '';
     options.zoom = options.zoom || '';
-    options.maxZoom = options.maxZoom || 17;
+    //options.maxZoom = options.maxZoom || 17;
+    options.maxZoom = options.maxZoom || 15;
     options.attribution = options.attribution || 'osm-static-maps | © OpenStreetMap contributors';
     options.tileserverUrl = options.tileserverUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
     options.vectorserverUrl = options.vectorserverUrl || '';
@@ -176,7 +228,8 @@ export default function(options) {
     options.style = (options.style && (typeof options.style === 'string' ? options.style : JSON.stringify(options.style))) || false;
     options.timeout = typeof options.timeout == undefined ? 20000 : options.timeout;
     options.haltOnConsoleError = !!options.haltOnConsoleError;
-
+    options.showLegend = options.showLegend || false;
+    
     (async () => {
 
       if (options.geojsonfile) {
@@ -196,6 +249,214 @@ export default function(options) {
         }
       }
 
+      if (options.routes) {
+        try {
+
+          if(!options.routes.vehicleOptions) options.routes.vehicleOptions = { color: "#3388ff", weight: 5 };
+          if(!options.routes.straightOptions) options.routes.straightOptions = { color: "#ff0000", weight: 3, dashArray: "5.5" };
+          
+          if(!options.routes.showVehicle) options.routes.showVehicle = true;
+          if(!options.routes.showStraight) options.routes.showStraight = true;
+          const defaultObj = {
+            //iconUrl: "data:image/png;base64,//markericonpng//", 
+            //iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+            iconUrl: `data:image/png;base64,${files.markericonpng}`,
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            visible: true
+          };
+
+          if (!options.routes.originMarker) options.routes.originMarker = defaultObj;
+          else {
+              if (!options.routes.originMarker.visible) options.routes.originMarker.visible = true;
+              if (!options.routes.originMarker.iconUrl) options.routes.originMarker.iconUrl = `data:image/png;base64,${files.markericonpng}`;
+              // Ajouter les options de cercle par défaut
+              if (!options.routes.originMarker.circle) {
+                  options.routes.originMarker.circle = {
+                      visible: true,
+                      radius: 500,
+                      color: '#3388ff',
+                      fillColor: '#3388ff',
+                      fillOpacity: 0.2,
+                      weight: 2
+                  };
+              }
+          }
+
+          // Faire de même pour destinationMarker
+          if (!options.routes.destinationMarker) options.routes.destinationMarker = defaultObj;
+          else {
+              if (!options.routes.destinationMarker.visible) options.routes.destinationMarker.visible = true;
+              if (!options.routes.destinationMarker.iconUrl) options.routes.destinationMarker.iconUrl = `data:image/png;base64,${files.markericonpng}`;
+              if (!options.routes.destinationMarker.circle) {
+                  options.routes.destinationMarker.circle = {
+                      visible: true,
+                      radius: 500,
+                      color: '#ff0000',
+                      fillColor: '#ff0000',
+                      fillOpacity: 0.2,
+                      weight: 2
+                  };
+              }
+          }
+
+          const { 
+            origin, 
+            destination, 
+            showVehicle,// = true, 
+            showStraight,// = true,
+            vehicleOptions,// = { color: "#3388ff", weight: 5 }, 
+            straightOptions,// = { color: "#ff0000", weight: 3, dashArray: "5,5" },
+            originMarker = {},
+            destinationMarker = {}
+          } = options.routes;
+        
+          console.log("ROUTE OPTIONS", options.routes);
+          const features = [];
+
+          // Ajout des marqueurs
+          if (originMarker?.visible !== false) {
+            features.push({
+                type: "Feature",
+                geometry: { type: "Point", coordinates: origin },
+                properties: {
+                    markerOptions: {
+                        circle: originMarker.circle,
+                        iconOptions: {
+                            iconUrl: originMarker.iconUrl || `data:image/png;base64,${files.markericonpng}`,
+                            iconSize: originMarker.iconSize || [25, 41],
+                            iconAnchor: originMarker.iconAnchor || [12, 41]
+                        }
+                    }
+                }
+            });
+          }
+
+          if (destinationMarker?.visible !== false) {
+            features.push({
+                type: "Feature",
+                geometry: { type: "Point", coordinates: destination },
+                properties: {
+                    markerOptions: {
+                        circle: destinationMarker.circle,
+                        iconOptions: {
+                            iconUrl: destinationMarker.iconUrl || `data:image/png;base64,${files.markericonpng}`,
+                            iconSize: destinationMarker.iconSize || [25, 41],
+                            iconAnchor: destinationMarker.iconAnchor || [12, 41]
+                        }
+                    }
+                }
+            });
+          }
+          
+          if (showVehicle) {
+            const vehicleGeometry = await calculateVehicleRoute(origin, destination);
+            if (vehicleGeometry) {
+              const distance = calculateDistance(vehicleGeometry.coordinates);
+              features.push({
+                type: "Feature",
+                geometry: vehicleGeometry,
+                properties: {
+                  routeType: "vehicle",
+                  pathOptions: vehicleOptions,
+                  distance: formatDistance(distance)
+                },
+              });
+            }
+          }
+          
+          if (showStraight) {
+            const straightGeometry = createStraightLineRoute(origin, destination);
+            const distance = calculateDistance(straightGeometry.coordinates);
+            features.push({
+              type: "Feature",
+              geometry: straightGeometry,
+              properties: {
+                routeType: "straight",
+                pathOptions: straightOptions,
+                distance: formatDistance(distance)
+              },
+              // pathOptions: straightOptions
+            });
+          }
+          
+          if (features.length > 0) {
+            const routesFeatureCollection = {
+              type: "FeatureCollection",
+              features: features
+            };
+            
+            if (options.geojson) {
+              const existingGeoJson = JSON.parse(options.geojson);
+              options.geojson = JSON.stringify({
+                type: "FeatureCollection",
+                features: [
+                  ...routesFeatureCollection.features,
+                  ...(existingGeoJson.features || existingGeoJson)
+                ]
+              });
+            } else {
+              options.geojson = JSON.stringify(routesFeatureCollection);
+            }
+          }
+        } catch (e) {
+          console.error('Error processing routes:', e);
+        }
+      }
+      
+      /*if (options.routes && !options.center && !options.zoom) {
+          // Calcule des bounds optimisés pour les routes
+          const { origin, destination } = options.routes;
+          
+          // Crée des bounds légèrement élargis autour des points
+          const latDiff = Math.abs(destination[1] - origin[1]);
+          const lngDiff = Math.abs(destination[0] - origin[0]);
+          
+          // Ajoute une marge proportionnelle à la distance
+          const margin = Math.max(latDiff, lngDiff) * 0.1; // 10% de marge
+          
+          const minLat = Math.min(origin[1], destination[1]) - margin;
+          const maxLat = Math.max(origin[1], destination[1]) + margin;
+          const minLng = Math.min(origin[0], destination[0]) - margin;
+          const maxLng = Math.max(origin[0], destination[0]) + margin;
+          
+          // Centre automatique
+          options.center = `${(minLng + maxLng) / 2},${(minLat + maxLat) / 2}`;
+          
+          // Zoom calculé en fonction de la distance
+          const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+          if (distance < 0.01) options.zoom = 15;
+          else if (distance < 0.05) options.zoom = 13;
+          else if (distance < 0.1) options.zoom = 12;
+          else if (distance < 0.5) options.zoom = 10;
+          else options.zoom = 8;
+      }*/
+
+      if (options.routes && !options.zoom && !options.center) {
+          // Calcul intelligent du zoom selon la distance entre les points
+          const { origin, destination } = options.routes;
+          const latDiff = Math.abs(destination[1] - origin[1]);
+          const lngDiff = Math.abs(destination[0] - origin[0]);
+          const maxDiff = Math.max(latDiff, lngDiff);
+          
+          // Zoom adaptatif basé sur la distance
+          let calculatedZoom;
+          if (maxDiff > 1) calculatedZoom = 8;
+          else if (maxDiff > 0.5) calculatedZoom = 9;
+          else if (maxDiff > 0.2) calculatedZoom = 10;
+          else if (maxDiff > 0.1) calculatedZoom = 11;
+          else if (maxDiff > 0.05) calculatedZoom = 12;
+          else if (maxDiff > 0.02) calculatedZoom = 13;
+          else calculatedZoom = 14;
+          
+          options.zoom = Math.min(calculatedZoom, options.maxZoom);
+          
+          // Centre entre les deux points
+          const centerLat = (origin[1] + destination[1]) / 2;
+          const centerLng = (origin[0] + destination[0]) / 2;
+          options.center = `${centerLng},${centerLat}`;
+      }
+      
       const html = replacefiles(template(options));
 
       if (options.renderToHtml) {

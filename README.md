@@ -96,6 +96,32 @@ All parameters have a short and long version. The short version can be used only
 
 [Read the blogpost](https://jperelli.com.ar/project/2019/10/01/osm-static-maps/) on the creation of this library and how it works internally
 
+## URL for Testing
+
+You can test the API locally using the following example URLs:
+
+- Static map:
+  ```
+  http://localhost:3000/?geojson=[{"type":"Feature","properties":{"party":"Republican"},"geometry":{"type":"Polygon","coordinates":[[[-104.05,48.99],[-97.22,48.98],[-96.58,45.94],[-104.03,45.94],[-104.05,48.99]]]}},{"type":"Feature","properties":{"party":"Democrat"},"geometry":{"type":"Polygon","coordinates":[[[-109.05,41.00],[-102.06,40.99],[-102.03,36.99],[-109.04,36.99],[-109.05,41.00]]]}}]&height=300&width=300
+  ```
+
+- Dynamic map:
+  ```
+  http://localhost:3000/dynamic?geojson=[{"type":"Feature","properties":{"party":"Republican"},"geometry":{"type":"Polygon","coordinates":[[[-104.05,48.99],[-97.22,48.98],[-96.58,45.94],[-104.03,45.94],[-104.05,48.99]]]}},{"type":"Feature","properties":{"party":"Democrat"},"geometry":{"type":"Polygon","coordinates":[[[-109.05,41.00],[-102.06,40.99],[-102.03,36.99],[-109.04,36.99],[-109.05,41.00]]]}}]&height=300&width=300
+  ```
+
+  Simple Point:
+  ```
+  http://localhost:3000/?geojson={"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[11.519596, 3.868177]}}]}&height=300&width=500
+  ```
+
+  Link on render:
+  ```
+  https://osmsm-more-features.onrender.com
+  ```
+  
+
+Replace the `geojson` parameter with your own data as needed.
 ## LICENSE
 
  - GPLv2

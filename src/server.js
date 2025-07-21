@@ -51,6 +51,28 @@ const handler = (res, params) => {
       `'geojsonfile' parameter on server only allowed if filename starts with http(s)`
     );
   }
+
+  // Parse routes parameters if present
+  if (params.routes) {
+    try {
+      params.routes = JSON.parse(params.routes);
+    } catch (e) {
+      console.error('Failed to parse routes parameter', e);
+      delete params.routes;
+    }
+  }
+  /*
+  if (params.routes) {
+    try {
+      // Décoder d'abord les caractères encodés en URL
+      const decodedRoutes = decodeURIComponent(params.routes);
+      params.routes = JSON.parse(decodedRoutes);
+    } catch (e) {
+      console.error('Failed to parse routes parameter', e);
+      return res.status(400).end('Invalid routes parameter: ' + e.message);
+    }
+  }
+  */
   osmsm(params)
     .then((data) => res.end(data))
     .catch((err) => res.status(500).end(err.toString()));
