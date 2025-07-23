@@ -26,12 +26,12 @@
             bottom: 10px;
             left: 10px;
             z-index: 1000;
-            background: rgba(255, 255, 255, 0.6);
+            background: rgba(200, 200, 200, 0.3);
             padding: 10px;
-            border-radius: 5px;
             font-family: Arial, sans-serif;
             font-size: 12px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+            border: 1px solid rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
         }
 
         .legend-item {
@@ -103,10 +103,64 @@
         .map-label div {
             transition: all 0.2s ease;
             text-align: center;
+            transform: translate(0, -75px);
         }
 
         .map-label div:hover {
             transform: scale(1.05);
+        }
+
+        .scale-control {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(200, 200, 200, 0.3);
+            padding: 3px 5px;
+            border: 1px solid #333;
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .scale-line {
+            height: 10px;
+            background: transparent;
+            margin-top: 3px;
+            position: relative;
+            display: flex;
+            flex-direction: row;
+            border: black 1px solid;
+        }
+
+        .scale-line div {
+            flex: 1;
+            margin: 0;
+            height: 100%;
+            width: 50%;
+        }
+
+        .scale-label {
+            margin-top: 2px;
+            font-weight: bold;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .north-arrow {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            z-index: 1000;
+            width: 50px;
+            height: 70px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
         }
         </style>
         <script>
@@ -128,8 +182,6 @@
 
     </head>
     <body>
-        {{!-- <div id="map"></div> --}}
-
         {{#if showLegend}}
             <div id="map">
                 <div class="legend">
@@ -137,14 +189,14 @@
                         {{#if routes.originMarker.visible}}
                         <div class="legend-item">
                             <div class="legend-color" style="background-image: url({{routes.originMarker.iconUrl}}); background-size: contain; background-repeat: no-repeat; background-position: center;"></div>
-                            <span>Point de départ</span>
+                            <span>{{#if routes.originMarker.legend}}{{routes.originMarker.legend}}{{else}}{{routes.originMarker.label}}{{/if}}</span>
                         </div>
                         {{/if}}
                     
                         {{#if routes.destinationMarker.visible}}
                         <div class="legend-item">
                             <div class="legend-color" style="background-image: url({{routes.destinationMarker.iconUrl}}); background-size: contain; background-repeat: no-repeat; background-position: center;"></div>
-                            <span>Point d'arrivée</span>
+                            <span>{{#if routes.destinationMarker.legend}}{{routes.destinationMarker.legend}}{{else}}{{routes.destinationMarker.label}}{{/if}}</span>
                         </div>
                         {{/if}}
 
@@ -163,37 +215,27 @@
                         {{/if}}
 
                         {{#if routes.originMarker}}
-                            {{#if routes.originMarker.legend}}
-                            <div class="legend-item">
-                                <div class="legend-color" style="
-                                    {{#if routes.originMarker.circle}}
-                                        width: {{routes.originMarker.circle.radius}}px;
-                                        height: {{routes.originMarker.circle.radius}}px;
-                                        border-radius: 50%;
+                            {{#if routes.originMarker.circle.legend}}
+                                <div class="legend-item">
+                                    <div class="legend-line" style="
+                                        background-color: {{routes.originMarker.circle.fillColor}}; 
+                                        opacity: {{routes.originMarker.circle.fillOpacity}}; 
                                         border: {{routes.originMarker.circle.weight}}px solid {{routes.originMarker.circle.color}};
-                                        background: {{routes.originMarker.circle.fillColor}};
-                                        opacity: {{routes.originMarker.circle.fillOpacity}};
-                                    {{/if}}
-                                "></div>
-                                <span>{{routes.originMarker.legend}}</span>
-                            </div>
+                                        height: 5px;"></div>
+                                    <span>{{routes.originMarker.circle.legend}}</span>
+                                </div>
                             {{/if}}
                         {{/if}}
                         
                         {{#if routes.destinationMarker}}
-                            {{#if routes.destinationMarker.legend}}
+                            {{#if routes.destinationMarker.circle.legend}}
                             <div class="legend-item">
-                                <div class="legend-color" style="
-                                    {{#if routes.destinationMarker.circle}}
-                                        width: {{routes.destinationMarker.circle.radius}}px;
-                                        height: {{routes.destinationMarker.circle.radius}}px;
-                                        border-radius: 50%;
-                                        border: {{routes.destinationMarker.circle.weight}}px solid {{routes.destinationMarker.circle.color}};
-                                        background: {{routes.destinationMarker.circle.fillColor}};
-                                        opacity: {{routes.destinationMarker.circle.fillOpacity}};
-                                    {{/if}}
-                                "></div>
-                                <span>{{routes.destinationMarker.legend}}</span>
+                                <div class="legend-line" style="
+                                    background-color: {{routes.destinationMarker.circle.fillColor}}; 
+                                    opacity: {{routes.destinationMarker.circle.fillOpacity}}; 
+                                    border: {{routes.destinationMarker.circle.weight}}px solid {{routes.destinationMarker.circle.color}};
+                                    height: 5px;"></div>
+                                <span>{{routes.destinationMarker.circle.legend}}</span>
                             </div>
                             {{/if}}
                         {{/if}}
@@ -209,8 +251,157 @@
             function onLoadFn() {
                 window.mapRendered = true;
                 console.log('map rendered time: ' + (performance.now() - initTime) + 'ms');
+
+                addScaleControl();
+                addNorthArrow();
             }
 
+            const LABEL_STYLES = {
+                style1: {
+                    borderColor: '#333',
+                    backgroundColor: 'rgba(255,255,255,0.8)',
+                    textColor: '#333',
+                    padding: '3px 8px',
+                    borderRadius: '1px',
+                    borderWidth: '1px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                },
+                style2: {
+                    textStroke: '0.5px #fff',
+                    textColor: 'black',
+                    textWidth: 'auto',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                }
+            };
+            
+            function addScaleControl() {
+                // Vérifier si l'échelle doit être affichée
+                {{#if showScale}}
+                    // Créer le conteneur de l'échelle
+                    const scaleContainer = L.DomUtil.create('div', 'scale-control');
+                    document.getElementById('map').appendChild(scaleContainer);
+                    
+                    // Mettre à jour l'échelle quand la carte bouge
+                    map.on('moveend', updateScale);
+                    updateScale();
+                {{else}}
+                    return;
+                {{/if}}
+                
+                function updateScale() {
+                    // Calculer la distance approximative (en mètres) pour 100 pixels
+                    const center = map.getCenter();
+                    const point1 = map.latLngToContainerPoint(center);
+                    const point2 = map.latLngToContainerPoint(
+                        L.latLng(center.lat, center.lng + 0.1)
+                    );
+                    const pixelDistance = point2.x - point1.x;
+                    const meterDistance = 0.1 * 111320 * Math.cos(center.lat * Math.PI / 180);
+                    const metersPerPixel = meterDistance / pixelDistance;
+                    const targetMeters = 100 * metersPerPixel;
+                    
+                    // Arrondir à une valeur "propre" (100m, 1km, etc.)
+                    const roundedDistance = getRoundedDistance(targetMeters);
+                    const pixelLength = roundedDistance / metersPerPixel;
+                    
+                    // Mettre à jour l'affichage
+                    scaleContainer.innerHTML = `
+                        <div class="scale-label">
+                            <span>0</span>
+                            <span>${formatDistance(roundedDistance)}</span>
+                        </div>
+                        <div class="scale-line" style="width: ${pixelLength}px;">
+                            <div style="background: black;"></div>
+                            <div style="background: transparent;"></div>
+                        </div>
+                    `;
+                }
+                
+                function getRoundedDistance(meters) {
+                    if (meters < 100) return Math.round(meters / 10) * 10;
+                    if (meters < 1000) return Math.round(meters / 100) * 100;
+                    if (meters < 5000) return Math.round(meters / 500) * 500;
+                    return Math.round(meters / 1000) * 1000;
+                }
+                
+                function formatDistance(meters) {
+                    if (meters >= 1000) return (meters / 1000).toFixed(1) + ' km';
+                    return meters + ' m';
+                }
+            }
+
+            // Appeler la fonction après l'initialisation de la carte
+            setTimeout(addScaleControl, 500);
+
+            var showNorthArrow = {{#if showNorthArrow}}true{{else}}false{{/if}};
+
+            function addNorthArrow() {
+                if (!window.showNorthArrow) return;
+                
+                const arrow = L.DomUtil.create('div', 'north-arrow');
+                arrow.style.backgroundImage = `url(data:image/png;base64,//northArrow//)`;
+                document.getElementById('map').appendChild(arrow);
+            }
+
+            // Appeler la fonction après l'initialisation de la carte
+            setTimeout(addNorthArrow, 500);
+
+            function getExtendedBounds(geojson, width, height) {
+                const coords = geojson.features.flatMap(f => {
+                    if (f.geometry.type === 'LineString') return f.geometry.coordinates;
+                    if (f.geometry.type === 'Point') return [f.geometry.coordinates];
+                    return [];
+                });
+                
+                if (coords.length === 0) return null;
+
+                // Calcul des bounds initiaux
+                let minLat = Infinity, maxLat = -Infinity;
+                let minLng = Infinity, maxLng = -Infinity;
+                
+                coords.forEach(coord => {
+                    minLat = Math.min(minLat, coord[1]);
+                    maxLat = Math.max(maxLat, coord[1]);
+                    minLng = Math.min(minLng, coord[0]);
+                    maxLng = Math.max(maxLng, coord[0]);
+                });
+
+                // Calcul des ratios
+                const latRange = maxLat - minLat;
+                const lngRange = maxLng - minLng;
+                const routeRatio = lngRange / latRange;
+                const imageRatio = width / height;
+
+                // Ajustement des bounds
+                if (routeRatio > imageRatio) {
+                    // Besoin de plus d'espace vertical
+                    const neededHeight = lngRange / imageRatio;
+                    const center = (minLat + maxLat) / 2;
+                    minLat = center - neededHeight / 2;
+                    maxLat = center + neededHeight / 2;
+                } else {
+                    // Besoin de plus d'espace horizontal
+                    const neededWidth = latRange * imageRatio;
+                    const center = (minLng + maxLng) / 2;
+                    minLng = center - neededWidth / 2;
+                    maxLng = center + neededWidth / 2;
+                }
+
+                // Ajout de marge
+                const latMargin = (maxLat - minLat) * 0.1;
+                const lngMargin = (maxLng - minLng) * 0.1;
+                
+                console.log("OPTIMIWED IN TEMPLATE", [
+                    [minLat - latMargin, minLng - lngMargin],
+                    [maxLat + latMargin, maxLng + lngMargin]
+                ]);
+
+                return [
+                    [minLat - latMargin, minLng - lngMargin],
+                    [maxLat + latMargin, maxLng + lngMargin]
+                ];
+            }
             {{#if arrows}}
                 var decorator = L.Symbol.arrowHead({
                     pixelSize: 6,
@@ -295,6 +486,8 @@
                                         ${style.textStroke ? `-webkit-text-stroke: ${style.textStroke}; text-stroke: ${style.textStroke};` : ''}
                                         ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
                                         ${style.textWidth ? `width: ${style.textWidth};` : ''}
+                                        ${style.fontSize ? `font-size: ${style.fontSize};` : ''}
+                                        ${style.boxShadow ? `box-shadow: ${style.boxShadow};` : ''}
                                         display: inline-block;
                                         white-space: nowrap;
                                     ">${markerOptions.label}</div>`,
@@ -307,7 +500,8 @@
                         }
                         
                         return marker;
-                    }
+                    },
+                    
                     onEachFeature: function (feature, layer) {
                         {{#if arrows}}
                             /*if (feature.type == 'LineString' || (feature.geometry && feature.geometry.type == 'LineString')) {
@@ -324,43 +518,55 @@
                         if (feature.properties?.distance && feature.geometry?.type === 'LineString') {
                             const coords = feature.geometry.coordinates;
                             const n = coords.length;
+                            let labelCoords;
 
-                            // Choisir une position sûre pour le label (jamais après le dernier point)
-                            let labelIndex;
-                            if (n < 3) {
-                                labelIndex = Math.floor(n / 2);
-                            } else {
-                                // 25% pour véhicule, 75% pour straight mais jamais au-delà du dernier point - 1
+                            // Cas spécial pour les lignes droites (2 points)
+                            if (n === 2 && feature.properties?.routeType === 'straight') {
+                                // Calculer la position à 75% entre les deux points
+                                const [lon1, lat1] = coords[0];
+                                const [lon2, lat2] = coords[1];
+                                const ratio = 0.75;
+                                
+                                labelCoords = [
+                                    lon1 + (lon2 - lon1) * ratio,
+                                    lat1 + (lat2 - lat1) * ratio
+                                ];
+                                
+                                // Calculer l'angle de la ligne droite
+                                angle = Math.atan2(lat2 - lat1, lon2 - lon1) * 180 / Math.PI;
+                            } 
+                            // Cas normal pour les trajets véhicules
+                            else {
+                                let labelIndex;
                                 if (feature.properties?.routeType === 'vehicle') {
-                                    labelIndex = Math.max(1, Math.floor(n * 0.25));
+                                    labelIndex = Math.max(1, Math.floor(n * 0.3)); // 30% pour véhicule
                                 } else {
-                                    labelIndex = Math.min(n - 2, Math.floor(n * 0.75));
+                                    labelIndex = Math.min(n - 2, Math.floor(n * 0.75)); // 75% pour autres
                                 }
-                            }
-                            labelIndex = Math.max(0, Math.min(n - 1, labelIndex));
-                            let labelCoords = coords[labelIndex];
+                                labelIndex = Math.max(0, Math.min(n - 1, labelIndex));
+                                labelCoords = coords[labelIndex];
 
-                            // Calculer l'angle moyen autour du point sélectionné
-                            const sampleRadius = Math.floor(n * 0.1);
-                            const start = Math.max(0, labelIndex - sampleRadius);
-                            const end = Math.min(n - 1, labelIndex + sampleRadius);
-                            
-                            let totalX = 0, totalY = 0, count = 0;
-                            for (let i = start; i <= end; i++) {
-                                totalX += coords[i][0];
-                                totalY += coords[i][1];
-                                count++;
+                                // Calculer l'angle moyen autour du point sélectionné
+                                const sampleRadius = Math.floor(n * 0.1);
+                                const start = Math.max(0, labelIndex - sampleRadius);
+                                const end = Math.min(n - 1, labelIndex + sampleRadius);
+                                
+                                let totalX = 0, totalY = 0, count = 0;
+                                for (let i = start; i <= end; i++) {
+                                    totalX += coords[i][0];
+                                    totalY += coords[i][1];
+                                    count++;
+                                }
+                                const avgX = totalX / count;
+                                const avgY = totalY / count;
+                                
+                                angle = Math.atan2(avgY - coords[start][1], avgX - coords[start][0]) * 180 / Math.PI;
                             }
-                            const avgX = totalX / count;
-                            const avgY = totalY / count;
-                            
-                            // Calculer l'angle moyen du segment
-                            const angle = Math.atan2(avgY - coords[start][1], avgX - coords[start][0]) * 180 / Math.PI;
-                            
-                            // Déterminer la direction du décalage (toujours vers l'intérieur du tracé)
+
+                            // Déterminer la direction du décalage
                             const isVehicleRoute = feature.properties?.routeType === 'vehicle';
                             const offsetDirection = isVehicleRoute ? 1 : -1;
-                            let currentOffsetDistance = 0.0012; // Déclarer avec let pour pouvoir modifier
+                            let currentOffsetDistance = 0.0012;
                             
                             // Calculer la position avec décalage perpendiculaire
                             const perpendicularAngle = (angle + 90) * Math.PI / 180;
@@ -369,7 +575,7 @@
                             
                             // Ajustement pour garder l'étiquette dans les limites
                             const bounds = map.getBounds();
-                            const maxAdjustments = 5;
+                            const maxAdjustments = 3;
                             let adjustments = 0;
                             
                             while (adjustments < maxAdjustments) {
@@ -377,11 +583,10 @@
                                 const testLng = labelCoords[0] + offsetLng;
                                 
                                 if (bounds.contains([testLat, testLng])) {
-                                    break; // Position valide trouvée
+                                    break;
                                 }
                                 
-                                // Réduire progressivement le décalage
-                                currentOffsetDistance *= 0.7; // Modification de la variable let
+                                currentOffsetDistance *= 0.7;
                                 offsetLat = Math.sin(perpendicularAngle) * currentOffsetDistance * offsetDirection;
                                 offsetLng = Math.cos(perpendicularAngle) * currentOffsetDistance * offsetDirection;
                                 adjustments++;
@@ -392,20 +597,24 @@
                                 labelCoords[0] + offsetLng
                             ];
 
-                            // Création du marqueur avec style minimaliste
+                            // Style différent pour chaque type de route
+                            const bgColor = isVehicleRoute ? 'rgba(51, 136, 255, 0.7)' : 'rgba(255, 0, 0, 0.7)';
+                            const borderColor = isVehicleRoute ? '#3388ff' : '#ff0000';
+                            
                             L.marker(labelPosition, {
                                 icon: L.divIcon({
                                     html: `<div style="
-                                        background: rgba(255,255,255,0.85);
-                                        color: ${isVehicleRoute ? '#3388ff' : '#ff0000'};
-                                        padding: 3px 8px;
-                                        border-radius: 10px;
-                                        font: 600 11px/1.2 system-ui, sans-serif;
+                                        background: ${bgColor};
+                                        color: white;
+                                        padding: 2px 8px;
+                                        border-radius: 12px;
+                                        font: bold 11px/1.2 Arial, sans-serif;
                                         display: inline-block;
                                         white-space: nowrap;
-                                        text-shadow: 0 1px 1px rgba(255,255,255,0.8);
-                                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                                        border: none;
+                                        text-align: center;
+                                        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                                        border: 1px solid ${borderColor};
+                                        transform-origin: center center;
                                     ">${feature.properties.distance}</div>`,
                                     className: 'distance-label',
                                     iconSize: null,
@@ -415,7 +624,7 @@
                                 zIndexOffset: 1000
                             }).addTo(map);
                         }
-                    },
+                                        },
                     style: function(feature) {
                         // Style de base
                         let style = {
@@ -465,10 +674,16 @@
                     paddingBottomRight: [5, 5]
                 });*/
                 
-                map.fitBounds(geojsonlayer.getBounds(), {
-                    maxZoom: 14, // Limite le zoom maximum à 14 au lieu de maxZoom
-                    padding: [8, 8] // Augmente légèrement le padding à 20px
-                });
+                const extendedBounds = getExtendedBounds({{{ geojson }}}, {{width}}, {{height}});
+                if (extendedBounds) {
+                    map.fitBounds(L.latLngBounds(
+                        L.latLng(extendedBounds[0][0], extendedBounds[0][1]),
+                        L.latLng(extendedBounds[1][0], extendedBounds[1][1])
+                    ), {
+                        padding: [10, 10],
+                        maxZoom: {{maxZoom}}
+                    });
+                }
             {{/if}}
 
             {{#if center}}

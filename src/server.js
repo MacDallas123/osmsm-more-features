@@ -55,7 +55,8 @@ const handler = (res, params) => {
   // Parse routes parameters if present
   if (params.routes) {
     try {
-      params.routes = JSON.parse(params.routes);
+      if(params.routes instanceof String)
+        params.routes = JSON.parse(params.routes);
     } catch (e) {
       console.error('Failed to parse routes parameter', e);
       delete params.routes;
@@ -79,7 +80,7 @@ const handler = (res, params) => {
 };
 
 app.get("/", (req, res) => handler(res, req.query));
-app.post("/", (req, res) => handler(res, req.body));
+app.post("/", express.json(), (req, res) => handler(res, req.body));
 
 app.get("/dynamic", (req, res) => {
   handler(res, { ...req.query, renderToHtml: true })

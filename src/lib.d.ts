@@ -2,6 +2,15 @@ import { Control, IconOptions, PathOptions } from "leaflet";
 
 export = _default;
 
+interface CircleOptions {
+    visible: boolean;
+    radius: number;
+    color: number;
+    fillColor: string;
+    fillOpacity: number;
+    weight: number;
+}
+
 interface OsmStaticMapsOptions {
   /**
    * Geojson object to be rendered in the map
@@ -153,15 +162,28 @@ interface OsmStaticMapsOptions {
     showStraight?: boolean;
     vehicleOptions?: PathOptions;
     straightOptions?: PathOptions;
-    originMarker?: IconOptions & { visible?: boolean }; // Style du marqueur d'origine
-    destinationMarker?: IconOptions & { visible?: boolean }; // Style du marqueur de destination
+    originMarker?: IconOptions & { visible?: boolean, circle?: CircleOptions }; // Style du marqueur d'origine
+    destinationMarker?: IconOptions & { visible?: boolean, circle?: CircleOptions }; // Style du marqueur de destination
   };
 
   /**
-   * Affiche une légende sur la carte
+   * Show the legend on the map
    * @defaultValue `false`
    */
   showLegend?: boolean;
+
+  /**
+   * Show a north arrow on the map
+   * @defaultValue `true`
+   */
+  showNorthArrow?: boolean;
+
+  /**
+   * Show a graphic scale on the map
+   * If `true`, uses default options for the scale control.
+   * @defaultValue `true`
+   */
+  showScale?: boolean;
 }
 
 /** Renders a map controlled by the options passed and returns an image */

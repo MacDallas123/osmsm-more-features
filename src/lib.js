@@ -30,23 +30,6 @@ async function calculateVehicleRoute(origin, destination) {
   }
 }
 
-const LABEL_STYLES = {
-    style1: {
-        borderColor: '#333',
-        backgroundColor: 'rgba(255,255,255,0.8)',
-        textColor: '#333',
-        padding: '3px 8px',
-        borderRadius: '4px',
-        borderWidth: '1px'
-    },
-    style2: {
-        textStroke: '1px #fff',
-        textColor: '#333',
-        textWidth: 'auto',
-        fontWeight: 'bold'
-    }
-};
-
 function createStraightLineRoute(origin, destination) {
   return {
     type: "LineString",
@@ -85,6 +68,55 @@ function formatDistance(meters) {
   return Math.round(meters) + ' m';
 }
 
+
+function getExtendedBounds(geojson, width, height) {
+    const coords = geojson.features.flatMap(f => 
+        f.geometry.type === 'LineString' ? f.geometry.coordinates :
+        f.geometry.type === 'Point' ? [f.geometry.coordinates] :
+        []
+    );
+    
+    if (coords.length === 0) return null;
+
+    // Calculer les bounds initiaux
+    const lats = coords.map(c => c[1]);
+    const lngs = coords.map(c => c[0]);
+    const bounds = [
+        [Math.min(...lats), Math.min(...lngs)],
+        [Math.max(...lats), Math.max(...lngs)]
+    ];
+
+    // Calculer le ratio image/itinéraire
+    const latRange = bounds[1][0] - bounds[0][0];
+    const lngRange = bounds[1][1] - bounds[0][1];
+    const routeRatio = lngRange / latRange;
+    const imageRatio = width / height;
+
+    // Ajuster les bounds pour correspondre au ratio de l'image
+    if (routeRatio > imageRatio) {
+        // Étendre verticalement
+        const neededHeight = lngRange / imageRatio;
+        const center = (bounds[0][0] + bounds[1][0]) / 2;
+        bounds[0][0] = center - neededHeight / 2;
+        bounds[1][0] = center + neededHeight / 2;
+    } else {
+        // Étendre horizontalement
+        const neededWidth = latRange * imageRatio;
+        const center = (bounds[0][1] + bounds[1][1]) / 2;
+        bounds[0][1] = center - neededWidth / 2;
+        bounds[1][1] = center + neededWidth / 2;
+    }
+
+    // Ajouter une marge de 10%
+    const latMargin = (bounds[1][0] - bounds[0][0]) * 0.1;
+    const lngMargin = (bounds[1][1] - bounds[0][1]) * 0.1;
+    
+    return [
+        [bounds[0][0] - latMargin, bounds[0][1] - lngMargin],
+        [bounds[1][0] + latMargin, bounds[1][1] + lngMargin]
+    ];
+}
+
 function getDep(nodeModulesFile, binary = false) {
   const abspath = fileURLToPath(import.meta.resolve(nodeModulesFile));
   if (binary) {
@@ -103,6 +135,7 @@ const files = {
   mapboxcss: getDep('mapbox-gl/dist/mapbox-gl.css'),
   leafletmapboxjs: getDep('mapbox-gl-leaflet/leaflet-mapbox-gl.js'),
   markericonpng: getDep('leaflet/dist/images/marker-icon.png', true),
+  northArrow: getDep('./north.png', true)
 }
 const templatestr = getDep('./template.html');
 const template = handlebars.compile(templatestr);
@@ -243,11 +276,13 @@ export default function(options) {
     options.scale = (options.scale && (typeof options.scale === 'string' ? options.scale : JSON.stringify(options.scale))) || false;
     options.markerIconOptions = (options.markerIconOptions && (typeof options.markerIconOptions === 'string' ? options.markerIconOptions : JSON.stringify(options.markerIconOptions))) || false;
     options.style = (options.style && (typeof options.style === 'string' ? options.style : JSON.stringify(options.style))) || false;
-    options.timeout = typeof options.timeout == undefined ? 20000 : options.timeout;
+    options.timeout = typeof options.timeout == undefined ? 60000 : options.timeout;
     options.haltOnConsoleError = !!options.haltOnConsoleError;
-    options.showLegend = options.showLegend || false;
+    options.showLegend = options.showLegend !== false;
     options.forceTransparentFill = options.forceTransparentFill !== true;
-
+    options.showScale = options.showScale !== false;
+    options.showNorthArrow = options.showNorthArrow !== false;
+    
     (async () => {
 
       if (options.geojsonfile) {
@@ -310,6 +345,7 @@ export default function(options) {
               if (!options.routes.destinationMarker.iconUrl) options.routes.destinationMarker.iconUrl = `data:image/png;base64,${files.markericonpng}`;
               if (!options.routes.destinationMarker.circle) {
                   options.routes.destinationMarker.circle = {
+                      legend: "circle legend",
                       visible: true,
                       radius: 500,
                       color: '#ff0000',
@@ -333,7 +369,7 @@ export default function(options) {
             destinationMarker = {}
           } = options.routes;
         
-          console.log("ROUTE OPTIONS", options.routes);
+          //console.log("ROUTE OPTIONS", options.routes);
           const features = [];
 
           // Ajout des marqueurs
@@ -373,7 +409,7 @@ export default function(options) {
                         },
                         label: destinationMarker.label || null,
                         legend: destinationMarker.legend || null,
-                        labelStyle: destinationMarker.labelStyle || 'style1',
+                        labelStyle: destinationMarker.labelStyle || 'style2',
                         customLabelStyle: destinationMarker.customLabelStyle || null
                     }
                 }
@@ -434,59 +470,6 @@ export default function(options) {
         } catch (e) {
           console.error('Error processing routes:', e);
         }
-      }
-      
-      /*if (options.routes && !options.center && !options.zoom) {
-          // Calcule des bounds optimisés pour les routes
-          const { origin, destination } = options.routes;
-          
-          // Crée des bounds légèrement élargis autour des points
-          const latDiff = Math.abs(destination[1] - origin[1]);
-          const lngDiff = Math.abs(destination[0] - origin[0]);
-          
-          // Ajoute une marge proportionnelle à la distance
-          const margin = Math.max(latDiff, lngDiff) * 0.1; // 10% de marge
-          
-          const minLat = Math.min(origin[1], destination[1]) - margin;
-          const maxLat = Math.max(origin[1], destination[1]) + margin;
-          const minLng = Math.min(origin[0], destination[0]) - margin;
-          const maxLng = Math.max(origin[0], destination[0]) + margin;
-          
-          // Centre automatique
-          options.center = `${(minLng + maxLng) / 2},${(minLat + maxLat) / 2}`;
-          
-          // Zoom calculé en fonction de la distance
-          const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-          if (distance < 0.01) options.zoom = 15;
-          else if (distance < 0.05) options.zoom = 13;
-          else if (distance < 0.1) options.zoom = 12;
-          else if (distance < 0.5) options.zoom = 10;
-          else options.zoom = 8;
-      }*/
-
-      if (options.routes && !options.zoom && !options.center) {
-          // Calcul intelligent du zoom selon la distance entre les points
-          const { origin, destination } = options.routes;
-          const latDiff = Math.abs(destination[1] - origin[1]);
-          const lngDiff = Math.abs(destination[0] - origin[0]);
-          const maxDiff = Math.max(latDiff, lngDiff);
-          
-          // Zoom adaptatif basé sur la distance
-          let calculatedZoom;
-          if (maxDiff > 1) calculatedZoom = 8;
-          else if (maxDiff > 0.5) calculatedZoom = 9;
-          else if (maxDiff > 0.2) calculatedZoom = 10;
-          else if (maxDiff > 0.1) calculatedZoom = 11;
-          else if (maxDiff > 0.05) calculatedZoom = 12;
-          else if (maxDiff > 0.02) calculatedZoom = 13;
-          else calculatedZoom = 14;
-          
-          options.zoom = Math.min(calculatedZoom, options.maxZoom);
-          
-          // Centre entre les deux points
-          const centerLat = (origin[1] + destination[1]) / 2;
-          const centerLng = (origin[0] + destination[0]) / 2;
-          options.center = `${centerLng},${centerLat}`;
       }
       
       const html = replacefiles(template(options));

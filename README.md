@@ -112,13 +112,28 @@ You can test the API locally using the following example URLs:
 
   Simple Point:
   ```
-  http://localhost:3000/?geojson={"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[11.519596, 3.868177]}}]}&height=300&width=500
+  http://localhost:3000/?geojson={"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[11.519596, 3.868177]}}]}destinationMarker
   ```
 
-  Link on render:
-  ```
-  https://osmsm-more-features.onrender.com
-  ```
+Use it for all features:
+```
+http://localhost:3000/?routes={"origin":[11.729596,3.768177],"destination":[11.319596,3.868177],"originMarker":{"label":"DEPART","circle":{"legend":"Zone influence depart","visible":true,"radius":10000,"color":"purple","fillColor":"green","fillOpacity":0.4,"weight":2}},"destinationMarker":{"label":"ARRIVEE","circle":{"legend":"Zone influence arrivee","visible":true,"radius":8000,"color":"red","fillColor":"orange","fillOpacity":0.4,"weight":2}}}&markerVisible=true&showLegend=true&showScale=true&showNorthArrow=true&height=600&width=1000&tileserverUrl="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+```
+
+Use it for all features (contracted by default values):
+```
+http://localhost:3000/?routes={"origin":[11.729596,3.768177],"destination":[11.319596,3.868177],"originMarker":{"label":"DEPART","circle":{"legend":"Zone influence depart","visible":true,"radius":10000,"color":"purple","fillColor":"green","fillOpacity":0.4,"weight":2}},"destinationMarker":{"label":"ARRIVEE","circle":{"legend":"Zone influence arrivee","visible":true,"radius":8000,"color":"red","fillColor":"orange","fillOpacity":0.4,"weight":2}}}&markerVisible=true&height=600&width=1000
+```
+
+Cutomize origin marker:
+```
+http://localhost:3000/?routes={"origin":[11.729596,3.768177],"destination":[11.319596,3.868177],"originMarker":{"iconUrl":"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png","iconSize":[25, 41],"iconAnchor": [12, 41],"visible": true, "label":"DEPART","circle":{"legend":"Zone influence depart","visible":true,"radius":10000,"color":"purple","fillColor":"green","fillOpacity":0.4,"weight":2}},"destinationMarker":{"label":"ARRIVEE","circle":{"legend":"Zone influence arrivee","visible":true,"radius":8000,"color":"red","fillColor":"orange","fillOpacity":0.4,"weight":2}}}&markerVisible=true&height=600&width=1000
+```
+
+Link on render:
+```
+https://osmsm-more-features.onrender.com
+```
   
 
 Replace the `geojson` parameter with your own data as needed.
