@@ -174,9 +174,11 @@ class Browser {
         this.browser = await this.launch();
       }
       catch (e) {
+        this.openingBrowser = false;
         console.log(e)
         console.log('Error opening browser')
         console.log(JSON.stringify(e, undefined, 2))
+        throw e;
       }
       this.openingBrowser = false;
     }
@@ -184,6 +186,7 @@ class Browser {
   }
   async getPage() {
     const browser = await this.getBrowser()
+
     return browser.newPage()
   }
 }
