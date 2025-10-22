@@ -28,7 +28,8 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN yarn install
+# RUN yarn install
+RUN npm ci
 
 COPY . .
 EXPOSE 3000
