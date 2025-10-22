@@ -3,7 +3,9 @@ version: "3.2"
 services:
 
   osmsm:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
     ports:
       - 3000:3000
     volumes:
