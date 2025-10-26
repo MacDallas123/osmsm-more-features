@@ -130,6 +130,11 @@ Cutomize origin marker:
 http://localhost:3000/?routes={"origin":[11.729596,3.768177],"destination":[11.319596,3.868177],"originMarker":{"iconUrl":"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png","iconSize":[25, 41],"iconAnchor": [12, 41],"visible": true, "label":"DEPART","circle":{"legend":"Zone influence depart","visible":true,"radius":10000,"color":"purple","fillColor":"green","fillOpacity":0.4,"weight":2}},"destinationMarker":{"label":"ARRIVEE","circle":{"legend":"Zone influence arrivee","visible":true,"radius":8000,"color":"red","fillColor":"orange","fillOpacity":0.4,"weight":2}}}&markerVisible=true&height=600&width=1000
 ```
 
+Cutomize origin marker:
+```
+http://localhost:3000/?routes={"origin":[11.729596,3.768177],"destination":[11.319596,3.868177],"originMarker":{"iconUrl":"https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png","iconSize":[25, 41],"iconAnchor": [12, 41],"visible": true, "label":"DEPART","circle":{"legend":"Zone influence depart","visible":true,"radius":10000,"color":"purple","fillColor":"green","fillOpacity":0.4,"weight":2}},"destinationMarker":{"label":"ARRIVEE","circle":{"legend":"Zone influence arrivee","visible":true,"radius":8000,"color":"red","fillColor":"orange","fillOpacity":0.4,"weight":2}}}&markerVisible=true&height=600&width=1000
+```
+
 Link on render:
 ```
 https://osmsm-more-features.onrender.com

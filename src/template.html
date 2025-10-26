@@ -451,7 +451,7 @@
                 
                 var geojsonlayer = L.geoJson({{{ geojson }}}, {
                     pointToLayer: function (feature, latlng) {
-                        const markerOptions = feature.properties.markerOptions || {};
+                        const markerOptions = feature.properties?.markerOptions || {};
                         const marker = L.marker(latlng, {icon: defaultIcon});
                         
                         // Ajouter le cercle si spécifié

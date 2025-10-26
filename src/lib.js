@@ -307,7 +307,10 @@ export default function(options) {
 
       if (options.routes) {
         try {
-
+          try {
+            options.routes = JSON.parse(options.routes);
+          } catch (err) {}
+          
           if(!options.routes.vehicleOptions) options.routes.vehicleOptions = { color: "#3388ff", weight: 5 };
           if(!options.routes.straightOptions) options.routes.straightOptions = { color: "#ff0000", weight: 3, dashArray: "5.5" };
           
