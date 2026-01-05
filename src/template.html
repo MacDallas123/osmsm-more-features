@@ -454,52 +454,54 @@
                         const markerOptions = feature.properties?.markerOptions || {};
                         const marker = L.marker(latlng, {icon: defaultIcon});
                         
-                        // Ajouter le cercle si spécifié
-                        if (markerOptions.circle?.visible) {
-                            L.circle(latlng, {
-                                radius: markerOptions.circle.radius,
-                                color: markerOptions.circle.color,
-                                fillColor: markerOptions.circle.fillColor,
-                                fillOpacity: markerOptions.circle.fillOpacity,
-                                weight: markerOptions.circle.weight
-                            }).addTo(map);
-                        }
-                        
-                        // Ajouter le label si spécifié
-                        if (markerOptions.label) {
-                            const style = markerOptions.customLabelStyle || 
-                                        LABEL_STYLES[markerOptions.labelStyle] || 
-                                        LABEL_STYLES.style1;
+                        if(markerOptions.visible) {
+                            // Ajouter le cercle si spécifié
+                            if (markerOptions.circle?.visible) {
+                                L.circle(latlng, {
+                                    radius: markerOptions.circle.radius,
+                                    color: markerOptions.circle.color,
+                                    fillColor: markerOptions.circle.fillColor,
+                                    fillOpacity: markerOptions.circle.fillOpacity,
+                                    weight: markerOptions.circle.weight
+                                }).addTo(map);
+                            }
                             
-                            const offset = markerOptions.iconOptions?.iconAnchor ? 
-                                        [markerOptions.iconOptions.iconAnchor[0] + 10, 0] : 
-                                        [25, 0];
+                            // Ajouter le label si spécifié
+                            if (markerOptions.label) {
+                                const style = markerOptions.customLabelStyle || 
+                                            LABEL_STYLES[markerOptions.labelStyle] || 
+                                            LABEL_STYLES.style1;
+                                
+                                const offset = markerOptions.iconOptions?.iconAnchor ? 
+                                            [markerOptions.iconOptions.iconAnchor[0] + 10, 0] : 
+                                            [25, 0];
+                                
+                                L.marker(latlng, {
+                                    icon: L.divIcon({
+                                        html: `<div style="
+                                            ${style.borderColor ? `border: ${style.borderWidth || '1px'} solid ${style.borderColor};` : ''}
+                                            ${style.backgroundColor ? `background: ${style.backgroundColor};` : ''}
+                                            ${style.textColor ? `color: ${style.textColor};` : ''}
+                                            ${style.padding ? `padding: ${style.padding};` : ''}
+                                            ${style.borderRadius ? `border-radius: ${style.borderRadius};` : ''}
+                                            ${style.textStroke ? `-webkit-text-stroke: ${style.textStroke}; text-stroke: ${style.textStroke};` : ''}
+                                            ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
+                                            ${style.textWidth ? `width: ${style.textWidth};` : ''}
+                                            ${style.fontSize ? `font-size: ${style.fontSize};` : ''}
+                                            ${style.boxShadow ? `box-shadow: ${style.boxShadow};` : ''}
+                                            display: inline-block;
+                                            white-space: nowrap;
+                                        ">${markerOptions.label}</div>`,
+                                        className: 'map-label',
+                                        iconSize: null,
+                                        iconAnchor: offset
+                                    }),
+                                    zIndexOffset: 1000
+                                }).addTo(map);
+                            }
                             
-                            L.marker(latlng, {
-                                icon: L.divIcon({
-                                    html: `<div style="
-                                        ${style.borderColor ? `border: ${style.borderWidth || '1px'} solid ${style.borderColor};` : ''}
-                                        ${style.backgroundColor ? `background: ${style.backgroundColor};` : ''}
-                                        ${style.textColor ? `color: ${style.textColor};` : ''}
-                                        ${style.padding ? `padding: ${style.padding};` : ''}
-                                        ${style.borderRadius ? `border-radius: ${style.borderRadius};` : ''}
-                                        ${style.textStroke ? `-webkit-text-stroke: ${style.textStroke}; text-stroke: ${style.textStroke};` : ''}
-                                        ${style.fontWeight ? `font-weight: ${style.fontWeight};` : ''}
-                                        ${style.textWidth ? `width: ${style.textWidth};` : ''}
-                                        ${style.fontSize ? `font-size: ${style.fontSize};` : ''}
-                                        ${style.boxShadow ? `box-shadow: ${style.boxShadow};` : ''}
-                                        display: inline-block;
-                                        white-space: nowrap;
-                                    ">${markerOptions.label}</div>`,
-                                    className: 'map-label',
-                                    iconSize: null,
-                                    iconAnchor: offset
-                                }),
-                                zIndexOffset: 1000
-                            }).addTo(map);
+                            return marker;
                         }
-                        
-                        return marker;
                     },
                     
                     onEachFeature: function (feature, layer) {
