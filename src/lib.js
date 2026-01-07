@@ -9,20 +9,23 @@ let chrome = { args: [] };
 let puppeteer;
 
 if (process.env.AWS_LAMBDA_FUNCTION_VERSION) {
-  // running on the Vercel platform.
   chrome = import("chrome-aws-lambda");
   puppeteer = (await import("puppeteer-core")).default;
 } else {
-  // running locally.
   puppeteer = (await import("puppeteer")).default;
 }
 
 async function calculateVehicleRoute(origin, destination) {
-  // Utilisation de l'API OSRM (Open Source Routing Machine)
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=full&geometries=geojson`;
     const response = await httpGet(url);
     const data = JSON.parse(response);
+    
+    if (!data.routes || data.routes.length === 0) {
+      console.warn('OSRM returned no routes');
+      return null;
+    }
+    
     return data.routes[0].geometry;
   } catch (e) {
     console.error('OSRM request failed:', e);
@@ -38,7 +41,7 @@ function createStraightLineRoute(origin, destination) {
 }
 
 function calculateDistance(coords) {
-  const R = 6371e3; // Rayon de la Terre en mètres
+  const R = 6371e3;
   let total = 0;
 
   for (let i = 1; i < coords.length; i++) {
@@ -68,7 +71,6 @@ function formatDistance(meters) {
   return Math.round(meters) + ' m';
 }
 
-
 function getExtendedBounds(geojson, width, height) {
     const coords = geojson.features.flatMap(f => 
         f.geometry.type === 'LineString' ? f.geometry.coordinates :
@@ -78,7 +80,6 @@ function getExtendedBounds(geojson, width, height) {
     
     if (coords.length === 0) return null;
 
-    // Calculer les bounds initiaux
     const lats = coords.map(c => c[1]);
     const lngs = coords.map(c => c[0]);
     const bounds = [
@@ -86,28 +87,23 @@ function getExtendedBounds(geojson, width, height) {
         [Math.max(...lats), Math.max(...lngs)]
     ];
 
-    // Calculer le ratio image/itinéraire
     const latRange = bounds[1][0] - bounds[0][0];
     const lngRange = bounds[1][1] - bounds[0][1];
     const routeRatio = lngRange / latRange;
     const imageRatio = width / height;
 
-    // Ajuster les bounds pour correspondre au ratio de l'image
     if (routeRatio > imageRatio) {
-        // Étendre verticalement
         const neededHeight = lngRange / imageRatio;
         const center = (bounds[0][0] + bounds[1][0]) / 2;
         bounds[0][0] = center - neededHeight / 2;
         bounds[1][0] = center + neededHeight / 2;
     } else {
-        // Étendre horizontalement
         const neededWidth = latRange * imageRatio;
         const center = (bounds[0][1] + bounds[1][1]) / 2;
         bounds[0][1] = center - neededWidth / 2;
         bounds[1][1] = center + neededWidth / 2;
     }
 
-    // Ajouter une marge de 10%
     const latMargin = (bounds[1][0] - bounds[0][0]) * 0.1;
     const lngMargin = (bounds[1][1] - bounds[0][1]) * 0.1;
     
@@ -140,7 +136,6 @@ const files = {
 const templatestr = getDep('./template.html');
 const template = handlebars.compile(templatestr);
 
-
 function replacefiles(str) {
   const ff = Object.entries(files)
   let res = str
@@ -150,7 +145,6 @@ function replacefiles(str) {
 }
 
 class Browser {
-  /// browser singleton
   constructor() {
     this.browser = null;
   }
@@ -186,15 +180,12 @@ class Browser {
   }
   async getPage() {
     const browser = await this.getBrowser()
-
     return browser.newPage()
   }
 }
 const browser = new Browser();
 
-
 function httpGet(url) {
-  // from https://stackoverflow.com/a/41471647/912450
   const httpx = url.startsWith('https') ? https : http;
   return new Promise((resolve, reject) => {
     let req = httpx.get(url, (res) => {
@@ -214,8 +205,6 @@ function httpGet(url) {
 
 process.on("warning", (e) => console.warn(e.stack));
 
-
-// add network cache to cache tiles
 const cache = {};
 async function configCache(page) {
   await page.setRequestInterception(true);
@@ -242,7 +231,6 @@ async function configCache(page) {
           try {
               buffer = await response.buffer();
           } catch (error) {
-              // some responses do not contain buffer and do not need to be catched
               return;
           }
   
@@ -258,7 +246,6 @@ async function configCache(page) {
 
 export default function(options) {
   return new Promise(function(resolve, reject) {
-    // TODO: validate options to avoid template injection
     options = options || {};
     options.geojson = (options.geojson && (typeof options.geojson === 'string' ? options.geojson : JSON.stringify(options.geojson))) || '';
     options.geojsonfile = options.geojsonfile || '';
@@ -266,7 +253,6 @@ export default function(options) {
     options.width = options.width || 800;
     options.center = options.center || '';
     options.zoom = options.zoom || '';
-    //options.maxZoom = options.maxZoom || 17;
     options.maxZoom = options.maxZoom || 15;
     options.attribution = options.attribution || 'osm-static-maps | © OpenStreetMap contributors';
     options.tileserverUrl = options.tileserverUrl || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
@@ -275,16 +261,26 @@ export default function(options) {
     options.imagemin = options.imagemin || false;
     options.oxipng = options.oxipng || false;
     options.arrows = options.arrows || false;
-    options.markerVisible = options.markerVisible || false;
+    options.markerVisible = options.markerVisible !== false; // TRUE par défaut
     options.scale = (options.scale && (typeof options.scale === 'string' ? options.scale : JSON.stringify(options.scale))) || false;
     options.markerIconOptions = (options.markerIconOptions && (typeof options.markerIconOptions === 'string' ? options.markerIconOptions : JSON.stringify(options.markerIconOptions))) || false;
     options.style = (options.style && (typeof options.style === 'string' ? options.style : JSON.stringify(options.style))) || false;
     options.timeout = typeof options.timeout == undefined ? 60000 : options.timeout;
     options.haltOnConsoleError = !!options.haltOnConsoleError;
-    options.showLegend = options.showLegend !== false;
-    options.forceTransparentFill = options.forceTransparentFill !== true;
-    options.showScale = options.showScale !== false;
-    options.showNorthArrow = options.showNorthArrow !== false;
+    
+    // Fonction helper pour convertir en booléen
+    const parseBoolean = (value, defaultValue = true) => {
+      if (value === undefined || value === null) return defaultValue;
+      if (value === false || value === 'false' || value === '0' || value === 0) return false;
+      if (value === true || value === 'true' || value === '1' || value === 1) return true;
+      return defaultValue;
+    };
+    
+    // Gestion correcte des booléens (supporte: true/false, "true"/"false", 1/0, "1"/"0")
+    options.showLegend = parseBoolean(options.showLegend, true);
+    options.showScale = parseBoolean(options.showScale, true);
+    options.showNorthArrow = parseBoolean(options.showNorthArrow, true);
+    options.forceTransparentFill = parseBoolean(options.forceTransparentFill, false);
     
     (async () => {
 
@@ -307,122 +303,166 @@ export default function(options) {
 
       if (options.routes) {
         try {
-          try {
-            options.routes = JSON.parse(options.routes);
-          } catch (err) {}
+          // Parser les routes si c'est une chaîne
+          if (typeof options.routes === 'string') {
+            try {
+              options.routes = JSON.parse(options.routes);
+            } catch (err) {
+              console.error('Failed to parse routes string:', err);
+              throw new Error('Invalid routes JSON format');
+            }
+          }
           
-          if(!options.routes.vehicleOptions) options.routes.vehicleOptions = { color: "#3388ff", weight: 5 };
-          if(!options.routes.straightOptions) options.routes.straightOptions = { color: "#ff0000", weight: 3, dashArray: "5.5" };
+          // Valider les coordonnées
+          const { origin, destination } = options.routes;
+          if (!origin || !destination) {
+            throw new Error('Routes must contain origin and destination');
+          }
+          if (!Array.isArray(origin) || origin.length !== 2 || !Array.isArray(destination) || destination.length !== 2) {
+            throw new Error('Origin and destination must be arrays of [longitude, latitude]');
+          }
           
-          if(!options.routes.showVehicle) options.routes.showVehicle = true;
-          if(!options.routes.showStraight) options.routes.showStraight = true;
-          const defaultObj = {
-            //iconUrl: "data:image/png;base64,//markericonpng//", 
-            //iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+          // Configuration par défaut (véhicule = bleu, vol d'oiseau = rouge)
+          if (!options.routes.vehicleOptions) {
+            options.routes.vehicleOptions = { color: "#3388ff", weight: 5 };
+          }
+          if (!options.routes.straightOptions) {
+            options.routes.straightOptions = { color: "#ff0000", weight: 3, dashArray: "5,5" };
+          }
+          
+          if (options.routes.showVehicle === undefined) options.routes.showVehicle = true;
+          if (options.routes.showStraight === undefined) options.routes.showStraight = true;
+          
+          const defaultMarkerObj = {
             iconUrl: `data:image/png;base64,${files.markericonpng}`,
             iconSize: [25, 41],
             iconAnchor: [12, 41],
             visible: true
           };
 
-          if (!options.routes.originMarker) options.routes.originMarker = defaultObj;
-          else {
-              if (!options.routes.originMarker.visible) options.routes.originMarker.visible = true;
-              if (!options.routes.originMarker.iconUrl) options.routes.originMarker.iconUrl = `data:image/png;base64,${files.markericonpng}`;
-              // Ajouter les options de cercle par défaut
-              if (!options.routes.originMarker.circle) {
-                  options.routes.originMarker.circle = {
-                      visible: true,
-                      radius: 500,
-                      color: '#3388ff',
-                      fillColor: '#3388ff',
-                      fillOpacity: 0.2,
-                      weight: 2
-                  };
-              } else if (options.forceTransparentFill) {
-                  options.routes.originMarker.circle.fillOpacity = 0.3;
-              }
+          // Configuration des marqueurs d'origine
+          if (!options.routes.originMarker) {
+            options.routes.originMarker = defaultMarkerObj;
+          } else {
+            if (options.routes.originMarker.visible === undefined) {
+              options.routes.originMarker.visible = true;
+            }
+            if (!options.routes.originMarker.iconUrl) {
+              options.routes.originMarker.iconUrl = `data:image/png;base64,${files.markericonpng}`;
+            }
+            if (!options.routes.originMarker.iconSize) {
+              options.routes.originMarker.iconSize = [25, 41];
+            }
+            if (!options.routes.originMarker.iconAnchor) {
+              options.routes.originMarker.iconAnchor = [12, 41];
+            }
+            
+            // Configuration du cercle
+            if (options.routes.originMarker.circle === undefined) {
+              options.routes.originMarker.circle = {
+                visible: true,
+                radius: 500,
+                color: '#3388ff',
+                fillColor: '#3388ff',
+                fillOpacity: 0.2,
+                weight: 2,
+                legend: "Zone d'influence départ"
+              };
+            } else if (options.routes.originMarker.circle && options.forceTransparentFill) {
+              options.routes.originMarker.circle.fillOpacity = 0.3;
+            }
           }
 
-          // Faire de même pour destinationMarker
-          if (!options.routes.destinationMarker) options.routes.destinationMarker = defaultObj;
-          else {
-              if (!options.routes.destinationMarker.visible) options.routes.destinationMarker.visible = true;
-              if (!options.routes.destinationMarker.iconUrl) options.routes.destinationMarker.iconUrl = `data:image/png;base64,${files.markericonpng}`;
-              if (!options.routes.destinationMarker.circle) {
-                  options.routes.destinationMarker.circle = {
-                      legend: "circle legend",
-                      visible: true,
-                      radius: 500,
-                      color: '#ff0000',
-                      fillColor: '#ff0000',
-                      fillOpacity: 0.2,
-                      weight: 2
-                  };
-              } else if (options.forceTransparentFill) {
-                  options.routes.originMarker.circle.fillOpacity = 0.3;
-              }
+          // Configuration des marqueurs de destination
+          if (!options.routes.destinationMarker) {
+            options.routes.destinationMarker = defaultMarkerObj;
+          } else {
+            if (options.routes.destinationMarker.visible === undefined) {
+              options.routes.destinationMarker.visible = true;
+            }
+            if (!options.routes.destinationMarker.iconUrl) {
+              options.routes.destinationMarker.iconUrl = `data:image/png;base64,${files.markericonpng}`;
+            }
+            if (!options.routes.destinationMarker.iconSize) {
+              options.routes.destinationMarker.iconSize = [25, 41];
+            }
+            if (!options.routes.destinationMarker.iconAnchor) {
+              options.routes.destinationMarker.iconAnchor = [12, 41];
+            }
+            
+            if (options.routes.destinationMarker.circle === undefined) {
+              options.routes.destinationMarker.circle = {
+                visible: true,
+                radius: 500,
+                color: '#ff0000',
+                fillColor: '#ff0000',
+                fillOpacity: 0.2,
+                weight: 2,
+                legend: "Zone d'influence arrivée"
+              };
+            } else if (options.routes.destinationMarker.circle && options.forceTransparentFill) {
+              options.routes.destinationMarker.circle.fillOpacity = 0.3;
+            }
           }
 
           const { 
-            origin, 
-            destination, 
-            showVehicle,// = true, 
-            showStraight,// = true,
-            vehicleOptions,// = { color: "#3388ff", weight: 5 }, 
-            straightOptions,// = { color: "#ff0000", weight: 3, dashArray: "5,5" },
-            originMarker = {},
-            destinationMarker = {}
+            showVehicle,
+            showStraight,
+            vehicleOptions, 
+            straightOptions,
+            originMarker,
+            destinationMarker
           } = options.routes;
         
-          //console.log("ROUTE OPTIONS", options.routes);
           const features = [];
 
-          // Ajout des marqueurs
-          if (originMarker?.visible !== false) {
-             const markerFeature = {
-                type: "Feature",
-                geometry: { type: "Point", coordinates: origin },
-                properties: {
-                    markerOptions: {
-                        circle: originMarker.circle,
-                        iconOptions: {
-                            iconUrl: originMarker.iconUrl || `data:image/png;base64,${files.markericonpng}`,
-                            iconSize: originMarker.iconSize || [25, 41],
-                            iconAnchor: originMarker.iconAnchor || [12, 41]
-                        },
-                        label: originMarker.label || null,
-                        legend: originMarker.legend || null,
-                        labelStyle: originMarker.labelStyle || 'style1',
-                        customLabelStyle: originMarker.customLabelStyle || null
-                    }
+          // Ajout du marqueur d'origine
+          if (originMarker.visible) {
+            features.push({
+              type: "Feature",
+              geometry: { type: "Point", coordinates: origin },
+              properties: {
+                markerOptions: {
+                  visible: true,
+                  circle: originMarker.circle,
+                  iconOptions: {
+                    iconUrl: originMarker.iconUrl,
+                    iconSize: originMarker.iconSize,
+                    iconAnchor: originMarker.iconAnchor
+                  },
+                  label: originMarker.label || null,
+                  legend: originMarker.legend || null,
+                  labelStyle: originMarker.labelStyle || 'style1',
+                  customLabelStyle: originMarker.customLabelStyle || null
                 }
-            };
-            features.push(markerFeature);
+              }
+            });
           }
 
-          if (destinationMarker?.visible !== false) {
-             const markerFeature = {
-                type: "Feature",
-                geometry: { type: "Point", coordinates: destination },
-                properties: {
-                    markerOptions: {
-                        circle: destinationMarker.circle,
-                        iconOptions: {
-                            iconUrl: destinationMarker.iconUrl || `data:image/png;base64,${files.markericonpng}`,
-                            iconSize: destinationMarker.iconSize || [25, 41],
-                            iconAnchor: destinationMarker.iconAnchor || [12, 41]
-                        },
-                        label: destinationMarker.label || null,
-                        legend: destinationMarker.legend || null,
-                        labelStyle: destinationMarker.labelStyle || 'style2',
-                        customLabelStyle: destinationMarker.customLabelStyle || null
-                    }
+          // Ajout du marqueur de destination
+          if (destinationMarker.visible) {
+            features.push({
+              type: "Feature",
+              geometry: { type: "Point", coordinates: destination },
+              properties: {
+                markerOptions: {
+                  visible: true,
+                  circle: destinationMarker.circle,
+                  iconOptions: {
+                    iconUrl: destinationMarker.iconUrl,
+                    iconSize: destinationMarker.iconSize,
+                    iconAnchor: destinationMarker.iconAnchor
+                  },
+                  label: destinationMarker.label || null,
+                  legend: destinationMarker.legend || null,
+                  labelStyle: destinationMarker.labelStyle || 'style2',
+                  customLabelStyle: destinationMarker.customLabelStyle || null
                 }
-            };
-            features.push(markerFeature);
+              }
+            });
           }
           
+          // Ajout de l'itinéraire véhicule
           if (showVehicle) {
             const vehicleGeometry = await calculateVehicleRoute(origin, destination);
             if (vehicleGeometry) {
@@ -434,11 +474,14 @@ export default function(options) {
                   routeType: "vehicle",
                   pathOptions: vehicleOptions,
                   distance: formatDistance(distance)
-                },
+                }
               });
+            } else {
+              console.warn('Vehicle route calculation failed, skipping vehicle route');
             }
           }
           
+          // Ajout de l'itinéraire direct
           if (showStraight) {
             const straightGeometry = createStraightLineRoute(origin, destination);
             const distance = calculateDistance(straightGeometry.coordinates);
@@ -449,11 +492,11 @@ export default function(options) {
                 routeType: "straight",
                 pathOptions: straightOptions,
                 distance: formatDistance(distance)
-              },
-              // pathOptions: straightOptions
+              }
             });
           }
           
+          // Intégration avec le GeoJSON existant
           if (features.length > 0) {
             const routesFeatureCollection = {
               type: "FeatureCollection",
@@ -466,7 +509,7 @@ export default function(options) {
                 type: "FeatureCollection",
                 features: [
                   ...routesFeatureCollection.features,
-                  ...(existingGeoJson.features || existingGeoJson)
+                  ...(existingGeoJson.features || [existingGeoJson])
                 ]
               });
             } else {
@@ -475,6 +518,7 @@ export default function(options) {
           }
         } catch (e) {
           console.error('Error processing routes:', e);
+          throw new Error(`Routes processing failed: ${e.message}`);
         }
       }
       
