@@ -14,4 +14,5 @@ results
 npm-debug.log
 node_modules
 Dockerfile copy.prod
+Dockerfile.old.prod
 src/template.zip
