@@ -32,7 +32,7 @@ RUN curl -L -o /usr/local/bin/oxipng https://github.com/shssoichiro/oxipng/relea
 # Créer le dossier de l'app
 WORKDIR /app
 COPY package*.json ./
-RUN yarn install --frozen-lockfile
+RUN yarn install --frozen-lockfile --network-timeout 600000
 COPY . .
 
 EXPOSE 3000
