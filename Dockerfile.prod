@@ -25,11 +25,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer oxipng (binaire)
-RUN wget https://github.com/shssoichiro/oxipng/releases/download/v7.1.0/oxipng-7.1.0-x86_64-unknown-linux-musl.tar.gz \
-    && tar xzf oxipng-7.1.0-x86_64-unknown-linux-musl.tar.gz \
-    && mv oxipng /usr/local/bin/ \
-    && rm oxipng-7.1.0-x86_64-unknown-linux-musl.tar.gz
+# Installer oxipng directement (binaire Linux x86_64)
+RUN curl -L -o /usr/local/bin/oxipng https://github.com/shssoichiro/oxipng/releases/download/v7.1.0/oxipng-x86_64-unknown-linux-musl \
+    && chmod +x /usr/local/bin/oxipng
 
 # Créer le dossier de l'app
 WORKDIR /app
