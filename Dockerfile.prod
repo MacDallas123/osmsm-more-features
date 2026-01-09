@@ -1,66 +1,38 @@
-FROM node:22-slim
+FROM node:22.0
 
-# Configuration APT pour connexions instables
-RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
-    echo 'Acquire::http::Timeout "300";' >> /etc/apt/apt.conf.d/80-retries && \
-    echo 'Acquire::ftp::Timeout "300";' >> /etc/apt/apt.conf.d/80-retries
+RUN \
+    apt-get update \
+    && \
+    apt-get install -y \
+        libx11-xcb1 \
+        libxtst6 \
+        libnss3 \
+        libxss1 \
+        libasound2 \
+        libatk-bridge2.0-0 \
+        libgtk-3-0 \
+        libdrm2 \
+        libgbm1 \
+        fonts-wqy-zenhei \
+    && \
+    rm -rf /var/lib/apt/lists/*
 
-# Installation en plusieurs étapes pour éviter timeout
-# Étape 1 : Update et dépendances de base
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    wget \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
+RUN \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && \
+    /root/.cargo/bin/cargo install oxipng
 
-# Étape 2 : Dépendances Chromium (sans Chromium lui-même)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    fonts-liberation \
-    fonts-noto-color-emoji \
-    libasound2 \
-    libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libcups2 \
-    libdrm2 \
-    libgbm1 \
-    libgtk-3-0 \
-    libnss3 \
-    libx11-xcb1 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libxss1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Étape 3 : Chromium seul (avec retry automatique)
-RUN for i in 1 2 3; do \
-        apt-get update && \
-        apt-get install -y --no-install-recommends chromium && \
-        rm -rf /var/lib/apt/lists/* && \
-        break || \
-        (echo "Retry $i/3..." && sleep 10); \
-    done
-
-# Vérifier que Chromium est installé
-RUN chromium --version || (echo "Chromium installation failed" && exit 1)
-
-# Définir le chemin de Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-
+    
+RUN mkdir /app
 WORKDIR /app
 
-# Installation des dépendances Node
-COPY package*.json yarn.lock* ./
+COPY package*.json ./
 
-RUN yarn install --frozen-lockfile \
-    --network-timeout 300000 \
-    --production=false \
-    --prefer-offline \
-    && yarn cache clean
+RUN yarn install --frozen-lockfile
+# RUN npm ci
 
 COPY . .
-
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+
+CMD [ "yarn", "start" ]
