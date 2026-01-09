@@ -147,44 +147,54 @@ function replacefiles(str) {
 class Browser {
   constructor() {
     this.browser = null;
-    this.pages = [];
   }
-
   async launch() {
+    const executablePath = await chrome.executablePath
+    return puppeteer.launch({
+      args: [...chrome.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process', // Important pour les VPS avec peu de RAM
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--window-size=1920,1080'],
+      defaultViewport: chrome.defaultViewport,
+      executablePath,
+      headless: true,
+      ignoreHTTPSErrors: true,
+    });
+  }
+  async getBrowser() {
+    if (this.openingBrowser) {
+      throw new Error('osm-static-maps is not ready, please wait a few seconds')
+    }
     if (!this.browser || !this.browser.isConnected()) {
-      const executablePath = await chrome.executablePath;
-      this.browser = await puppeteer.launch({
-        args: [...chrome.args, "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-accelerated-2d-canvas", "--no-first-run", "--no-zygote", "--disable-gpu"],
-        defaultViewport: chrome.defaultViewport,
-        executablePath,
-        headless: true,
-        ignoreHTTPSErrors: true,
-      });
-    }
-    return this.browser;
-  }
-
-  async getPage() {
-    await this.launch();
-    // Réutiliser une page libre
-    for (const p of this.pages) {
-      if (!p.busy) {
-        p.busy = true;
-        return p.page;
+      this.openingBrowser = true;
+      try {
+        this.browser = await this.launch();
       }
+      catch (e) {
+        this.openingBrowser = false;
+        console.log(e)
+        console.log('Error opening browser')
+        console.log(JSON.stringify(e, undefined, 2))
+        throw e;
+      }
+      this.openingBrowser = false;
     }
-    // Sinon créer une nouvelle page
-    const page = await this.browser.newPage();
-    this.pages.push({ page, busy: true });
-    return page;
+    return this.browser
   }
-
-  releasePage(page) {
-    const p = this.pages.find(x => x.page === page);
-    if (p) p.busy = false;
+  async getPage() {
+    const browser = await this.getBrowser()
+    return browser.newPage()
   }
 }
-
 const browser = new Browser();
 
 function httpGet(url) {
@@ -591,13 +601,11 @@ export default function(options) {
 
       }
       catch(e) {
-        await page.close().catch(() => {});
+        page.close();
         console.log("PAGE CLOSED with err" + e);
         throw(e);
       }
-      finally {
-        browser.releasePage(page);
-      }
+      page.close();
 
     })().catch(reject)
   });
