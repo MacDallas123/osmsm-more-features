@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile.prod
     ports:
       - 3000:3000
-    volumes:
-      - .:/app
-      - /app/node_modules
+    # volumes:
+    #   - .:/app
+    #   - /app/node_modules
     restart: unless-stopped
