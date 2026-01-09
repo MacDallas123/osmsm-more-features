@@ -183,6 +183,78 @@ class Browser {
     return browser.newPage()
   }
 }
+
+// Après la classe Browser, ajoutez :
+class BrowserPool {
+  constructor(maxInstances = 3) {
+    this.pool = [];
+    this.maxInstances = maxInstances;
+    this.activePages = new Set();
+  }
+
+  async getPage() {
+    // Nettoyer les pages inactives
+    for (const page of this.activePages) {
+      if (page.isClosed()) {
+        this.activePages.delete(page);
+      }
+    }
+
+    // Limiter le nombre de pages actives
+    if (this.activePages.size >= this.maxInstances * 2) {
+      console.warn('Too many active pages, waiting...');
+      await this.cleanup();
+    }
+
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
+    this.activePages.add(page);
+    return page;
+  }
+
+  async cleanup() {
+    const promises = [];
+    for (const page of this.activePages) {
+      try {
+        if (!page.isClosed()) {
+          promises.push(page.close().catch(() => {}));
+        }
+      } catch (e) {}
+    }
+    await Promise.all(promises);
+    this.activePages.clear();
+  }
+
+  async getBrowser() {
+    if (!this.browser || !this.browser.isConnected()) {
+      this.browser = await this.launch();
+    }
+    return this.browser;
+  }
+
+  async launch() {
+    const executablePath = await chrome.executablePath;
+    return puppeteer.launch({
+      args: [
+        ...chrome.args, 
+        "--no-sandbox", 
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage", // Important pour VPS
+        "--disable-accelerated-2d-canvas",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-gpu"
+      ],
+      defaultViewport: chrome.defaultViewport,
+      executablePath,
+      headless: true,
+      ignoreHTTPSErrors: true,
+    });
+  }
+}
+
+const browserPool = new BrowserPool(2);
+
 const browser = new Browser();
 
 function httpGet(url) {
@@ -206,41 +278,52 @@ function httpGet(url) {
 process.on("warning", (e) => console.warn(e.stack));
 
 const cache = {};
+const MAX_CACHE_SIZE = 100; // Limiter à 100 entrées
+const cacheKeys = []; // Pour FIFO
+
 async function configCache(page) {
   await page.setRequestInterception(true);
 
   page.on('request', async (request) => {
-      const url = request.url();
-      if (cache[url] && cache[url].expires > Date.now()) {
-          await request.respond(cache[url]);
-          return;
-      }
-      request.continue();
+    const url = request.url();
+    if (cache[url] && cache[url].expires > Date.now()) {
+      await request.respond(cache[url]);
+      return;
+    }
+    request.continue();
   });
   
   page.on('response', async (response) => {
-      const url = response.url();
-      const headers = response.headers();
-      const cacheControl = headers['cache-control'] || '';
-      const maxAgeMatch = cacheControl.match(/max-age=(\d+)/);
-      const maxAge = maxAgeMatch && maxAgeMatch.length > 1 ? parseInt(maxAgeMatch[1], 10) : 0;
-      if (maxAge) {
-          if (cache[url] && cache[url].expires > Date.now()) return;
-  
-          let buffer;
-          try {
-              buffer = await response.buffer();
-          } catch (error) {
-              return;
-          }
-  
-          cache[url] = {
-              status: response.status(),
-              headers: response.headers(),
-              body: buffer,
-              expires: Date.now() + (maxAge * 1000),
-          };
+    const url = response.url();
+    const headers = response.headers();
+    const cacheControl = headers['cache-control'] || '';
+    const maxAgeMatch = cacheControl.match(/max-age=(\d+)/);
+    const maxAge = maxAgeMatch && maxAgeMatch.length > 1 ? parseInt(maxAgeMatch[1], 10) : 0;
+    
+    if (maxAge) {
+      if (cache[url] && cache[url].expires > Date.now()) return;
+
+      let buffer;
+      try {
+        buffer = await response.buffer();
+      } catch (error) {
+        return;
       }
+
+      // Gestion FIFO du cache
+      if (cacheKeys.length >= MAX_CACHE_SIZE) {
+        const oldestKey = cacheKeys.shift();
+        delete cache[oldestKey];
+      }
+
+      cache[url] = {
+        status: response.status(),
+        headers: response.headers(),
+        body: buffer,
+        expires: Date.now() + (maxAge * 1000),
+      };
+      cacheKeys.push(url);
+    }
   });
 }
 
@@ -528,7 +611,7 @@ export default function(options) {
         return resolve(html);
       }
 
-      const page = await browser.getPage();
+      const page = await browserPool.getPage();
       await configCache(page);
       try {
         page.on('error', function (err) { reject(err.toString()) })
@@ -589,12 +672,34 @@ export default function(options) {
 
       }
       catch(e) {
-        page.close();
+        await page.close().catch(() => {});
         console.log("PAGE CLOSED with err" + e);
         throw(e);
       }
-      page.close();
+      finally {
+        await page.close().catch(() => {});
+      }
 
     })().catch(reject)
   });
 };
+
+// Nettoyer le cache toutes les 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  const keysToDelete = [];
+  
+  for (const key in cache) {
+    if (cache[key].expires < now) {
+      keysToDelete.push(key);
+    }
+  }
+  
+  keysToDelete.forEach(key => {
+    delete cache[key];
+    const index = cacheKeys.indexOf(key);
+    if (index > -1) cacheKeys.splice(index, 1);
+  });
+  
+  console.log(`Cache cleaned: ${keysToDelete.length} entries removed`);
+}, 10 * 60 * 1000);

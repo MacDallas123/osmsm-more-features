@@ -401,8 +401,13 @@
                 zoomControl: false,
                 center: initialPoint,
                 zoom: maxZoom,
-                maxZoom: maxZoom
+                maxZoom: maxZoom,
+                preferCanvas: true,  // Performance
+                renderer: L.canvas() // Forcer Canvas
             });
+
+            map.options.preferCanvas = true;
+            
             map.attributionControl.setPrefix('').addAttribution('{{ attribution }}');
 
             {{#if scale}}

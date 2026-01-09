@@ -268,6 +268,175 @@ http://localhost:3000/?routes={
 
 ---
 
+
+### 13. Exemple POST (avec curl) pour générer une image avec un point, un marqueur personnalisé et un cercle d'influence
+
+#### POST (Linux/macOS) :
+```bash
+curl -X POST "http://localhost:3000/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "geojson": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [11.519596, 3.868177]
+          },
+          "properties": {
+            "markerOptions": {
+              "visible": true,
+              "label": "Point d'intérêt",
+              "labelStyle": "style2",
+              "iconOptions": {
+                "iconUrl": "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+                "iconSize": [25, 41],
+                "iconAnchor": [12, 41]
+              },
+              "circle": {
+                "visible": true,
+                "radius": 500,
+                "color": "#3388ff",
+                "fillColor": "#3388ff",
+                "fillOpacity": 0.3,
+                "weight": 2,
+                "legend": "Zone d'influence 5km"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "height": 600,
+    "width": 800
+  }' \
+  -o marker_singleton.png
+```
+
+#### POST (Windows avec PowerShell) :
+curl -Method POST "http://localhost:3000/" `
+  -Headers @{ "Content-Type" = "application/json" } `
+  -Body '{
+    "geojson": {
+      "type": "FeatureCollection",
+      "features": [{
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates": [11.519596, 3.868177]
+        },
+        "properties": {
+          "markerOptions": {
+            "visible": true,
+            "label": "Point d''intérêt",
+            "labelStyle": "style2",
+            "circle": {
+              "visible": true,
+              "radius": 500,
+              "color": "#3388ff",
+              "fillColor": "#3388ff",
+              "fillOpacity": 0.3,
+              "weight": 2,
+              "legend": "Zone d''influence 5km"
+            }
+          }
+        }
+      }]
+    },
+    "height": 600,
+    "width": 800
+  }' `
+  -OutFile "marker_singleton.png"
+
+## 14. Afficher un cercle d’influence autour d’un point d’intérêt
+
+GET :
+```txt
+http://localhost:3000/?routes={
+  "origin":[11.519596,3.868177],
+  "destination":[11.519596,3.868177],
+  "showVehicle": false,
+  "showStraight": false,
+  "originMarker": {
+    "label": "Point d'intérêt",
+    "circle": {
+      "visible": true,
+      "radius": 5000,
+      "color": "#3388ff",
+      "fillColor": "#3388ff",
+      "fillOpacity": 0.3,
+      "weight": 2,
+      "legend": "Zone d'influence"
+    }
+  },
+  "destinationMarker": {"visible": false}
+}
+```
+
+POST (Linux/macOS) :
+```bash
+curl -X POST "http://localhost:3000/" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "routes": {
+      "origin": [11.519596,3.868177],
+      "destination": [11.519596,3.868177],
+      "showVehicle": false,
+      "showStraight": false,
+      "originMarker": {
+        "label": "Point d'\''intérêt",
+        "circle": {
+          "visible": true,
+          "radius": 500,
+          "color": "#3388ff",
+          "fillColor": "#3388ff",
+          "fillOpacity": 0.3,
+          "weight": 2,
+          "legend": "Zone d'\''influence"
+        }
+      },
+      "destinationMarker": {"visible": false}
+    },
+    "height": 600,
+    "width": 800
+  }' \
+  -o circle_influence.png
+```
+
+POST (Windows PowerShell) :
+```
+curl -Method POST "http://localhost:3000/" `
+  -Headers @{ "Content-Type" = "application/json" } `
+  -Body '{
+    "routes": {
+      "origin": [11.519596,3.868177],
+      "destination": [11.519596,3.868177],
+      "showVehicle": false,
+      "showStraight": false,
+      "originMarker": {
+        "label": "Point d''intérêt",
+        "circle": {
+          "visible": true,
+          "radius": 500,
+          "color": "#3388ff",
+          "fillColor": "#3388ff",
+          "fillOpacity": 0.3,
+          "weight": 2,
+          "legend": "Zone d''influence"
+        }
+      },
+      "destinationMarker": {"visible": false}
+    },
+    "height": 600,
+    "width": 800
+  }' `
+  -OutFile "circle_influence.png"
+```
+
+_Note_: For GET requests, URL-encode the value after `routes=` (e.g., using [urlencoder.org](https://www.urlencoder.org/)), or use this prettified version to understand available parameters.
+
 ## 🔧 Paramètres de l'API
 
 ### Paramètres généraux

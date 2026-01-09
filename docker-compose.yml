@@ -1,12 +1,23 @@
 services:
-
   osmsm:
     build:
       context: .
       dockerfile: Dockerfile.prod
     ports:
       - 3000:3000
-    volumes:
-      - .:/app
-      - /app/node_modules
     restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    shm_size: '256mb'  # Important pour Chromium
+    security_opt:
+      - seccomp:unconfined
