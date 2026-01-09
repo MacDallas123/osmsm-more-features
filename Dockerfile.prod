@@ -1,12 +1,48 @@
 FROM node:22-slim
 
-# Installation des dépendances système pour Chromium (version optimisée)
-RUN apt-get update && apt-get install -y \
-    chromium \
+# Configuration APT pour connexions instables
+RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "300";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::ftp::Timeout "300";' >> /etc/apt/apt.conf.d/80-retries
+
+# Installation en plusieurs étapes pour éviter timeout
+# Étape 1 : Update et dépendances de base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Étape 2 : Dépendances Chromium (sans Chromium lui-même)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     fonts-noto-color-emoji \
-    --no-install-recommends \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libatk1.0-0 \
+    libcups2 \
+    libdrm2 \
+    libgbm1 \
+    libgtk-3-0 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libxss1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Étape 3 : Chromium seul (avec retry automatique)
+RUN for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends chromium && \
+        rm -rf /var/lib/apt/lists/* && \
+        break || \
+        (echo "Retry $i/3..." && sleep 10); \
+    done
+
+# Vérifier que Chromium est installé
+RUN chromium --version || (echo "Chromium installation failed" && exit 1)
 
 # Définir le chemin de Chromium
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
@@ -14,19 +50,17 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
-# Copier uniquement les fichiers de dépendances d'abord (meilleure utilisation du cache)
+# Installation des dépendances Node
 COPY package*.json yarn.lock* ./
 
-# Installation avec optimisations
 RUN yarn install --frozen-lockfile \
-    --network-timeout 100000 \
+    --network-timeout 300000 \
     --production=false \
     --prefer-offline \
     && yarn cache clean
 
-# Copier le reste du code
 COPY . .
 
 EXPOSE 3000
 
-CMD ["node", "index.js"]
+CMD ["node", "server.js"]
