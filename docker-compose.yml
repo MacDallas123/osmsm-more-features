@@ -11,14 +11,19 @@ services:
     restart: unless-stopped
     
     # Limites de ressources (recommandé pour VPS)
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
+    # Les limitations ici (1 CPU et 1Go RAM max, 0.5 CPU et 512Mo réservés)
+    # permettent de contrôler la charge sur un VPS partagé.
+    # Si tu trouves que la génération d'images est trop lente,
+    # tu peux augmenter ces valeurs, surtout le nombre de CPUs et la RAM.
+    # Par exemple :
+    # deploy:
+    #   resources:
+    #     limits:
+    #       memory: 2G
+    #       cpus: '2.0'
+    #     reservations:
+    #       memory: 1G
+    #       cpus: '1.0'
     
     # Variables d'environnement
     environment:
