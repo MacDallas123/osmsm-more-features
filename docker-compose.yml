@@ -5,9 +5,9 @@ services:
       dockerfile: Dockerfile.prod
     ports:
       - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
+    # volumes:
+    #   - .:/app
+    #   - /app/node_modules
     restart: unless-stopped
     
     # Limites de ressources (recommandé pour VPS)
@@ -23,7 +23,7 @@ services:
     # Variables d'environnement
     environment:
       - NODE_ENV=production
-      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    #   - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
     
     # Santé du container
     healthcheck:
