@@ -134,7 +134,10 @@ http://localhost:3000/?routes={
     "iconUrl":"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
     "iconSize":[25,41],
     "iconAnchor":[12,41],
-    "label":"Point A"
+    "label":"Point A",
+    "circle": {
+      "visible": false
+    }
   },
   "destinationMarker":{
     "iconUrl":"https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
@@ -316,6 +319,7 @@ curl -X POST "http://localhost:3000/" \
 ```
 
 #### POST (Windows avec PowerShell) :
+```bash
 curl -Method POST "http://localhost:3000/" `
   -Headers @{ "Content-Type" = "application/json" } `
   -Body '{
@@ -349,6 +353,7 @@ curl -Method POST "http://localhost:3000/" `
     "width": 800
   }' `
   -OutFile "marker_singleton.png"
+```
 
 ## 14. Afficher un cercle d’influence autour d’un point d’intérêt
 
@@ -433,6 +438,42 @@ curl -Method POST "http://localhost:3000/" `
     "width": 800
   }' `
   -OutFile "circle_influence.png"
+```
+
+### 15. **Un seul marqueur**
+
+```
+https://osmsm.reimca-app.com/?routes={
+  "origin":[11.729596,3.768177],
+  "detination":[11.729596,3.768177],
+  "originMarker":{
+    "label":"DÉPART",
+    "labelStyle":"style1",
+    "circle":{
+      "visible":false,
+      "radius":10000,
+      "color":"purple",
+      "fillColor":"green",
+      "fillOpacity":0.4,
+      "weight":2,
+      "legend":"Zone d'influence départ"
+    }
+  },
+  "destinationMarker":{
+    "label":"ARRIVÉE",
+    "labelStyle":"style2",
+    "visible":false,
+    "circle":{
+      "visible":false,
+      "radius":8000,
+      "color":"red",
+      "fillColor":"orange",
+      "fillOpacity":0.4,
+      "weight":2,
+      "legend":"Zone d'influence arrivée"
+    }
+  }
+}&height=600&width=1000
 ```
 
 _Note_: For GET requests, URL-encode the value after `routes=` (e.g., using [urlencoder.org](https://www.urlencoder.org/)), or use this prettified version to understand available parameters.

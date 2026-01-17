@@ -339,11 +339,45 @@
             setTimeout(addNorthArrow, 500);
 
             function getExtendedBounds(geojson, width, height) {
-                const coords = geojson.features.flatMap(f => {
-                    if (f.geometry.type === 'LineString') return f.geometry.coordinates;
-                    if (f.geometry.type === 'Point') return [f.geometry.coordinates];
-                    return [];
-                });
+                const coords = [];
+                
+                function extractCoords(geometry) {
+                    if (!geometry) return;
+                    
+                    switch (geometry.type) {
+                        case 'Point':
+                            coords.push(geometry.coordinates);
+                            break;
+                        case 'LineString':
+                            coords.push(...geometry.coordinates);
+                            break;
+                        case 'Polygon':
+                            geometry.coordinates.forEach(ring => coords.push(...ring));
+                            break;
+                        case 'MultiPoint':
+                            coords.push(...geometry.coordinates);
+                            break;
+                        case 'MultiLineString':
+                            geometry.coordinates.forEach(line => coords.push(...line));
+                            break;
+                        case 'MultiPolygon':
+                            geometry.coordinates.forEach(polygon => 
+                                polygon.forEach(ring => coords.push(...ring))
+                            );
+                            break;
+                        case 'GeometryCollection':
+                            geometry.geometries.forEach(extractCoords);
+                            break;
+                    }
+                }
+                
+                if (geojson.type === 'FeatureCollection') {
+                    geojson.features.forEach(f => extractCoords(f.geometry));
+                } else if (geojson.type === 'Feature') {
+                    extractCoords(geojson.geometry);
+                } else {
+                    extractCoords(geojson);
+                }
                 
                 if (coords.length === 0) return null;
 
@@ -382,6 +416,7 @@
                     [maxLat + latMargin, maxLng + lngMargin]
                 ];
             }
+
             {{#if arrows}}
                 var decorator = L.Symbol.arrowHead({
                     pixelSize: 6,
@@ -434,7 +469,7 @@
                             : {{#if markerVisible}}true{{else}}false{{/if}};
                         
                         if (!shouldShowMarker) {
-                            return null;
+                            return L.circle(latlng, {radius: 0, opacity: 0});
                         }
                         
                         let markerIcon = defaultIcon;
@@ -495,6 +530,7 @@
                     },
                     
                     onEachFeature: function (feature, layer) {
+                        // Gestion des étiquettes de distance pour les routes
                         if (feature.properties?.distance && feature.geometry?.type === 'LineString') {
                             const coords = feature.geometry.coordinates;
                             const n = coords.length;
@@ -570,9 +606,7 @@
                                 labelCoords[0] + offsetLng
                             ];
 
-                            // Utiliser la couleur de la ligne pour l'étiquette
                             const lineColor = feature.properties.pathOptions?.color || (isVehicleRoute ? '#3388ff' : '#ff0000');
-                            const bgColor = lineColor.replace(/^#/, '') + 'CC'; // Ajouter transparence
                             const borderColor = lineColor;
                             
                             L.marker(labelPosition, {
@@ -599,21 +633,43 @@
                             }).addTo(map);
                         }
                     },
+                    
                     style: function(feature) {
                         let style = {
                             color: '#3388ff',
                             weight: 3,
-                            opacity: 1
+                            opacity: 1,
+                            fillColor: '#3388ff',
+                            fillOpacity: 0.2
                         };
 
+                        // 1. Appliquer les propriétés GeoJSON standards
+                        /*if (feature.properties) {
+                            if (feature.properties.stroke) style.color = feature.properties.stroke;
+                            if (feature.properties['stroke-width']) style.weight = feature.properties['stroke-width'];
+                            if (feature.properties['stroke-opacity']) style.opacity = feature.properties['stroke-opacity'];
+                            if (feature.properties.fill) style.fillColor = feature.properties.fill;
+                            if (feature.properties['fill-opacity']) style.fillOpacity = feature.properties['fill-opacity'];
+                        }*/
+                        if (feature.properties) {
+                            if (feature.properties.color) style.color = feature.properties.color;
+                            if (feature.properties.weight) style.weight = feature.properties.weight;
+                            if (feature.properties.opacity) style.opacity = feature.properties.opacity;
+                            if (feature.properties.fillColor) style.fillColor = feature.properties.fillColor;
+                            if (feature.properties.fillOpacity) style.fillOpacity = feature.properties.fillOpacity;
+                        }
+
+                        // 2. Appliquer pathOptions si présent
                         if (feature.pathOptions) {
                             Object.assign(style, feature.pathOptions);
                         }
                         
+                        // 3. Appliquer le style global
                         {{#if style}}
                             Object.assign(style, {{{ style }}});
                         {{/if}}
 
+                        // 4. Gérer les routes spécifiques
                         if (feature.geometry?.type === 'LineString') {
                             if (feature.properties?.routeType === 'vehicle') {
                                 Object.assign(style, {

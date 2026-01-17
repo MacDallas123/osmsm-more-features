@@ -15,6 +15,7 @@
     "url": "http://github.com/jperelli/osm-static-maps.git"
   },
   "dependencies": {
+    "body-parser": "^2.2.2",
     "chrome-aws-lambda": "^10.1.0",
     "commander": "^12.1.0",
     "express": "^4.19.2",

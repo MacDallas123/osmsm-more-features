@@ -171,46 +171,83 @@ function formatDistance(meters) {
 }
 
 function getExtendedBounds(geojson, width, height) {
-    const coords = geojson.features.flatMap(f => 
-        f.geometry.type === 'LineString' ? f.geometry.coordinates :
-        f.geometry.type === 'Point' ? [f.geometry.coordinates] :
-        []
-    );
+  const coords = [];
+  
+  function extractCoords(geometry) {
+    if (!geometry) return;
     
-    if (coords.length === 0) return null;
-
-    const lats = coords.map(c => c[1]);
-    const lngs = coords.map(c => c[0]);
-    const bounds = [
-        [Math.min(...lats), Math.min(...lngs)],
-        [Math.max(...lats), Math.max(...lngs)]
-    ];
-
-    const latRange = bounds[1][0] - bounds[0][0];
-    const lngRange = bounds[1][1] - bounds[0][1];
-    const routeRatio = lngRange / latRange;
-    const imageRatio = width / height;
-
-    if (routeRatio > imageRatio) {
-        const neededHeight = lngRange / imageRatio;
-        const center = (bounds[0][0] + bounds[1][0]) / 2;
-        bounds[0][0] = center - neededHeight / 2;
-        bounds[1][0] = center + neededHeight / 2;
-    } else {
-        const neededWidth = latRange * imageRatio;
-        const center = (bounds[0][1] + bounds[1][1]) / 2;
-        bounds[0][1] = center - neededWidth / 2;
-        bounds[1][1] = center + neededWidth / 2;
+    switch (geometry.type) {
+      case 'Point':
+        coords.push(geometry.coordinates);
+        break;
+      case 'LineString':
+        coords.push(...geometry.coordinates);
+        break;
+      case 'Polygon':
+        // Prendre tous les anneaux (extérieur + trous)
+        geometry.coordinates.forEach(ring => coords.push(...ring));
+        break;
+      case 'MultiPoint':
+        coords.push(...geometry.coordinates);
+        break;
+      case 'MultiLineString':
+        geometry.coordinates.forEach(line => coords.push(...line));
+        break;
+      case 'MultiPolygon':
+        geometry.coordinates.forEach(polygon => 
+          polygon.forEach(ring => coords.push(...ring))
+        );
+        break;
+      case 'GeometryCollection':
+        geometry.geometries.forEach(extractCoords);
+        break;
     }
+  }
+  
+  // Extraire les coordonnées de toutes les features
+  if (geojson.type === 'FeatureCollection') {
+    geojson.features.forEach(f => extractCoords(f.geometry));
+  } else if (geojson.type === 'Feature') {
+    extractCoords(geojson.geometry);
+  } else {
+    extractCoords(geojson);
+  }
+  
+  if (coords.length === 0) return null;
 
-    const latMargin = (bounds[1][0] - bounds[0][0]) * 0.1;
-    const lngMargin = (bounds[1][1] - bounds[0][1]) * 0.1;
-    
-    return [
-        [bounds[0][0] - latMargin, bounds[0][1] - lngMargin],
-        [bounds[1][0] + latMargin, bounds[1][1] + lngMargin]
-    ];
+  const lats = coords.map(c => c[1]);
+  const lngs = coords.map(c => c[0]);
+  const bounds = [
+    [Math.min(...lats), Math.min(...lngs)],
+    [Math.max(...lats), Math.max(...lngs)]
+  ];
+
+  const latRange = bounds[1][0] - bounds[0][0];
+  const lngRange = bounds[1][1] - bounds[0][1];
+  const routeRatio = lngRange / latRange;
+  const imageRatio = width / height;
+
+  if (routeRatio > imageRatio) {
+    const neededHeight = lngRange / imageRatio;
+    const center = (bounds[0][0] + bounds[1][0]) / 2;
+    bounds[0][0] = center - neededHeight / 2;
+    bounds[1][0] = center + neededHeight / 2;
+  } else {
+    const neededWidth = latRange * imageRatio;
+    const center = (bounds[0][1] + bounds[1][1]) / 2;
+    bounds[0][1] = center - neededWidth / 2;
+    bounds[1][1] = center + neededWidth / 2;
+  }
+
+  const latMargin = (bounds[1][0] - bounds[0][0]) * 0.1;
+  const lngMargin = (bounds[1][1] - bounds[0][1]) * 0.1;
+  
+  return [
+    [bounds[0][0] - latMargin, bounds[0][1] - lngMargin],
+    [bounds[1][0] + latMargin, bounds[1][1] + lngMargin]
+  ];
 }
+
 
 function getDep(nodeModulesFile, binary = false) {
   const abspath = fileURLToPath(import.meta.resolve(nodeModulesFile));
@@ -438,7 +475,15 @@ async function configCache(page) {
 export default function(options) {
   return new Promise(function(resolve, reject) {
     options = options || {};
-    options.geojson = (options.geojson && (typeof options.geojson === 'string' ? options.geojson : JSON.stringify(options.geojson))) || '';
+    // options.geojson = (options.geojson && (typeof options.geojson === 'string' ? options.geojson : JSON.stringify(options.geojson))) || '';
+    if (options.geojson) {
+      if (typeof options.geojson === 'object') {
+        options.geojson = JSON.stringify(options.geojson);
+      }
+      // Si c'est déjà une string, on la garde telle quelle
+    } else {
+      options.geojson = '';
+    }
     options.geojsonfile = options.geojsonfile || '';
     options.height = options.height || 600;
     options.width = options.width || 800;
@@ -476,11 +521,28 @@ export default function(options) {
 
       try {
         if (options.geojsonfile) {
+          // console.log("GEOJSON FILE: ", options.geojsonfile);
           if (options.geojson) {
             throw new Error(`Only one option allowed: 'geojsonfile' or 'geojson'`)
           }
           if (options.geojsonfile.startsWith("http://") || options.geojsonfile.startsWith("https://")) {
             options.geojson = await httpGet(options.geojsonfile, 15000);
+            try {
+              const geojsonObject = JSON.parse(options.geojson);
+              /* if (geojsonObject.type === 'FeatureCollection') {
+                // Affiche toutes les properties de chaque feature
+                geojsonObject.features.forEach((feat, idx) => {
+                  console.log(`GEOJSON Feature ${idx} properties: `, feat.properties);
+                });
+              } else if (geojsonObject.type === 'Feature') {
+                console.log("GEOJSON properties: ", geojsonObject.properties);
+              } else {
+                console.log("GEOJSON: Pas d'objet 'properties' au niveau racine du geojson.");
+              } */
+            } catch (e) {
+              console.warn("Impossible de parser ou afficher les properties du geojson: ", e.message);
+            }
+            // console.log("GEOJSON PROPERTIES: ", options.geojson.features.properties);
           }
           else {
             options.geojson = readFileSync(

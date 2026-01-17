@@ -3,6 +3,7 @@ import { createServer } from "http";
 import osmsm from "./lib.js";
 import { fileURLToPath } from 'url';
 import path from 'path';
+import bodyParser from 'body-parser';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,7 @@ app.set("views", __dirname + "/lib");
 app.set("view engine", "handlebars");
 app.set("view options", { layout: false });
 app.use(json({ limit: "50mb" }));
+app.use(bodyParser.json());
 
 app.use((req, res, next) => {
   const ip = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
