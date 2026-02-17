@@ -161,6 +161,25 @@
             background-repeat: no-repeat;
             filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
         }
+        .feature-name-label {
+            pointer-events: none;
+            user-select: none;
+            z-index: 1000;
+        }
+
+        .feature-name-label div {
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            transform: translate(-50%, -50%);
+        }
+
+        .feature-name-label div:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            background: rgba(255, 255, 255, 0.95) !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+        }
         </style>
         <script>
         //leafletjs//
@@ -692,7 +711,102 @@
                     },
                 });
                 geojsonlayer.addTo(map);
+
+                // ========================================
+                // AJOUT : Afficher les noms des features
+                // ========================================
+                function addFeatureNames(layer, feature) {
+                    if (!feature.properties || !feature.properties.name) return;
+                    
+                    const geometry = feature.geometry;
+                    const name = feature.properties.name;
+                    
+                    // Trouver le centre de la géométrie
+                    let center;
+                    
+                    if (geometry.type === 'Point') {
+                        center = L.latLng(geometry.coordinates[1], geometry.coordinates[0]);
+                    } 
+                    else if (geometry.type === 'LineString') {
+                        // Pour une ligne, prendre le point médian
+                        const coords = geometry.coordinates;
+                        const midIndex = Math.floor(coords.length / 2);
+                        center = L.latLng(coords[midIndex][1], coords[midIndex][0]);
+                    }
+                    else if (geometry.type === 'Polygon') {
+                        // Pour un polygone, utiliser le centroïde
+                        // Solution simple : prendre le premier anneau et calculer la moyenne
+                        const ring = geometry.coordinates[0];
+                        let lat = 0, lng = 0;
+                        ring.forEach(coord => {
+                            lat += coord[1];
+                            lng += coord[0];
+                        });
+                        center = L.latLng(lat / ring.length, lng / ring.length);
+                    }
+                    else if (geometry.type === 'MultiPolygon' || geometry.type === 'MultiLineString') {
+                        // Pour les multi-géométries, prendre le centre du premier élément
+                        const first = geometry.coordinates[0];
+                        if (geometry.type === 'MultiPolygon') {
+                            const ring = first[0];
+                            let lat = 0, lng = 0;
+                            ring.forEach(coord => {
+                                lat += coord[1];
+                                lng += coord[0];
+                            });
+                            center = L.latLng(lat / ring.length, lng / ring.length);
+                        } else {
+                            const midIndex = Math.floor(first.length / 2);
+                            center = L.latLng(first[midIndex][1], first[midIndex][0]);
+                        }
+                    }
+                    
+                    if (center) {
+                        // Style du label
+                        const labelStyle = {
+                            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                            border: '1px solid #333',
+                            borderRadius: '3px',
+                            padding: '2px 6px',
+                            color: '#333',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                        };
+                        
+                        // Adapter la couleur de fond selon le type de géométrie
+                        if (geometry.type === 'LineString') {
+                            labelStyle.backgroundColor = 'rgba(255, 255, 255, 0.7)';
+                            labelStyle.borderColor = '#666';
+                        } else if (geometry.type === 'Point') {
+                            labelStyle.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                            labelStyle.borderColor = '#000';
+                        }
+                        
+                        const styleStr = Object.entries(labelStyle)
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join('; ');
+                        
+                        L.marker(center, {
+                            icon: L.divIcon({
+                                html: `<div style="${styleStr}">${name}</div>`,
+                                className: 'feature-name-label',
+                                iconSize: null,
+                                iconAnchor: [0, 0]
+                            }),
+                            interactive: false,
+                            zIndexOffset: 1000
+                        }).addTo(map);
+                    }
+                }
                 
+                // Appliquer les noms sur toutes les features
+                geojsonlayer.eachLayer(function(layer) {
+                    if (layer.feature && layer.feature.properties && layer.feature.properties.name) {
+                        addFeatureNames(layer, layer.feature);
+                    }
+                });
+
                 const extendedBounds = getExtendedBounds({{{ geojson }}}, {{width}}, {{height}});
                 if (extendedBounds) {
                     map.fitBounds(L.latLngBounds(
